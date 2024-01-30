@@ -135,7 +135,18 @@ if [ -d "${CUDA_LIB_DIR}" ]; then
     if [ -n "${CUDA_MAJOR}" ]; then
         CUDA_VARIANT=_v${CUDA_MAJOR}
     fi
-    CMAKE_DEFS="-DLLAMA_CUBLAS=on -DLLAMA_CUDA_FORCE_MMQ=on -DCMAKE_CUDA_ARCHITECTURES=${CMAKE_CUDA_ARCHITECTURES} ${COMMON_CMAKE_DEFS} ${CMAKE_DEFS}"
+    if [ -f /etc/nv_tegra_release ]; then
+        echo "Tegra device detected - building Tegra compile options"
+        # Tegra doesn't have AVX extensions
+        TEGRA_COMMON_DEFS="-DCMAKE_POSITION_INDEPENDENT_CODE=on -DLLAMA_NATIVE=off"
+        TEGRA_CPU_DEFS="-DLLAMA_NATIVE=off -DLLAMA_AVX=off -DLLAMA_AVX2=off -DLLAMA_AVX512=off -DLLAMA_FMA=off"
+        # Compiler wasn't finding nvcc on its own for some reason.
+        TEGRA_COMPILER="-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc"
+        TEGRA_CUDA_DEFS="-DCMAKE_CUDA_STANDARD=17 -DLLAMA_CUBLAS=on -DLLAMA_CUDA_FORCE_MMQ=on  -DLLAMA_CUDA_F16=1"
+        CMAKE_DEFS="${TEGRA_COMPILER_DEFS} ${TEGRA_COMMON_DEFS} ${TEGRA_CPU_DEFS} ${TEGRA_CUDA_DEFS} -DCMAKE_CUDA_ARCHITECTURES=${CMAKE_CUDA_ARCHITECTURES}"
+    else
+        CMAKE_DEFS="-DLLAMA_CUBLAS=on -DLLAMA_CUDA_FORCE_MMQ=on -DCMAKE_CUDA_ARCHITECTURES=${CMAKE_CUDA_ARCHITECTURES} ${COMMON_CMAKE_DEFS} ${CMAKE_DEFS}"
+    fi
     BUILD_DIR="${LLAMACPP_DIR}/build/linux/${ARCH}/cuda${CUDA_VARIANT}"
     EXTRA_LIBS="-L${CUDA_LIB_DIR} -lcudart -lcublas -lcublasLt -lcuda"
     build

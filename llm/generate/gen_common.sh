@@ -39,6 +39,23 @@ init_vars() {
     *)
         ;;
     esac
+    if [ -f /etc/nv_tegra_release ] ; then
+        echo "Tegra device detected"
+
+        case (echo "${JETSON_CUDA_ARCH_BIN}" | cut -d'.' -f1) in
+        "6")
+            CMAKE_CUDA_ARCHITECTURES="61"
+            ;;
+        "7")
+            CMAKE_CUDA_ARCHITECTURES="70;75"
+            ;;
+        "8")
+            CMAKE_CUDA_ARCHITECTURES="80"
+            ;;
+        *)
+            ;;
+        esac
+    fi
     if [ -z "${CMAKE_CUDA_ARCHITECTURES}" ] ; then 
         CMAKE_CUDA_ARCHITECTURES="50;52;61;70;75;80"
     fi
