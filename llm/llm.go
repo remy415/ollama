@@ -94,6 +94,7 @@ func New(workDir, model string, adapters, projectors []string, opts api.Options)
 	
 			// TODO: implement layer splitting on Tegra
 			opts.NumGPU = 999
+			break
 		}
 
 		// don't use GPU at all if no layers are loaded
