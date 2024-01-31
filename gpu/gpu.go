@@ -20,11 +20,13 @@ import (
 	"strings"
 	"sync"
 	"unsafe"
+
+	"github.com/pbnjay/memory"
 )
 
 type handles struct {
-	cuda *C.cuda_handle_t
-	rocm *C.rocm_handle_t
+	cuda  *C.cuda_handle_t
+	rocm  *C.rocm_handle_t
 	tegra *C.tegra_handle_t
 }
 
@@ -82,7 +84,7 @@ func initGPUHandles() {
 	var cudaMgmtName string
 	var cudaMgmtPatterns []string
 	var rocmMgmtName string
-	var rocmMgmtPatterns []string	
+	var rocmMgmtPatterns []string
 	var tegraMgmtName string
 	var tegraMgmtPatterns []string
 	switch runtime.GOOS {
@@ -176,23 +178,22 @@ func GetGPUInfo() GpuInfo {
 			}
 		}
 	} else if gpuHandles.tegra != nil {
-		C.tegra_check_vram(*gpuHandles.tegra, &memInfo)
-		if memInfo.err != nil {
-			slog.Info(fmt.Sprintf("error looking up Tegra memory: %s", C.GoString(memInfo.err)))
-			C.free(unsafe.Pointer(memInfo.err))
+		// C.tegra_check_vram(*gpuHandles.tegra, &memInfo) // Tegra is iGPU, should gather data similar to MacOS
+		mem, _ := getCPUMem()
+		memInfo.free = C.uint64_t(mem.FreeMemory)
+		memInfo.total = C.uint64_t(mem.TotalMemory)
+		// Verify minimum compute capability
+		var tcc C.tegra_compute_capability_t
+		C.tegra_compute_capability(*gpuHandles.tegra, &tcc)
+		if tcc.err != nil {
+			slog.Info(fmt.Sprintf("error looking up Tegra SOC CUDA compute capability: %s", C.GoString(tcc.err)))
+			C.free(unsafe.Pointer(tcc.err))
+		} else if tcc.major > CudaComputeMin[0] || (tcc.major == CudaComputeMin[0] && tcc.minor >= CudaComputeMin[1]) {
+			slog.Info(fmt.Sprintf("Tegra CUDA Compute Capability detected: %d.%d", tcc.major, tcc.minor))
+			memInfo.count += 1
+			resp.Library = "tegra"
 		} else {
-			// Verify minimum compute capability
-			var tcc C.tegra_compute_capability_t
-			C.tegra_compute_capability(*gpuHandles.tegra, &tcc)
-			if tcc.err != nil {
-				slog.Info(fmt.Sprintf("error looking up Tegra SOC CUDA compute capability: %s", C.GoString(tcc.err)))
-				C.free(unsafe.Pointer(tcc.err))
-			} else if tcc.major > CudaComputeMin[0] || (tcc.major == CudaComputeMin[0] && tcc.minor >= CudaComputeMin[1]) {
-				slog.Info(fmt.Sprintf("Tegra CUDA Compute Capability detected: %d.%d", tcc.major, tcc.minor))
-				resp.Library = "tegra"
-			} else {
-				slog.Info(fmt.Sprintf("Tegra CUDA GPU is too old. Falling back to CPU mode. Compute Capability detected: %d.%d", tcc.major, tcc.minor))
-			}
+			slog.Info(fmt.Sprintf("Tegra CUDA GPU is too old. Falling back to CPU mode. Compute Capability detected: %d.%d", tcc.major, tcc.minor))
 		}
 	} else if gpuHandles.rocm != nil && (cpuVariant != "" || runtime.GOARCH != "amd64") {
 		C.rocm_check_vram(*gpuHandles.rocm, &memInfo)
@@ -265,7 +266,7 @@ func getCPUMem() (memInfo, error) {
 
 func CheckVRAM() (int64, error) {
 	gpuInfo := GetGPUInfo()
-	if gpuInfo.FreeMemory > 0 && (gpuInfo.Library == "cuda" || gpuInfo.Library == "tegra" || gpuInfo.Library == "rocm") {
+	if gpuInfo.FreeMemory > 0 && (gpuInfo.Library == "cuda" || gpuInfo.Library == "rocm") {
 		// leave 10% or 1024MiB of VRAM free per GPU to handle unaccounted for overhead
 		overhead := gpuInfo.FreeMemory / 10
 		gpus := uint64(gpuInfo.DeviceCount)
@@ -275,6 +276,18 @@ func CheckVRAM() (int64, error) {
 		avail := int64(gpuInfo.FreeMemory - overhead)
 		slog.Debug(fmt.Sprintf("%s detected %d devices with %dM available memory", gpuInfo.Library, gpuInfo.DeviceCount, avail/1024/1024))
 		return avail, nil
+	} else if gpuInfo.FreeMemory > 0 && gpuInfo.Library == "tegra" {
+		// Tegra SOCs are iGPUs and share GPU memory with system memory.
+		systemMemory := int64(memory.TotalMemory())
+
+		// TODO: handle case where iogpu.wired_limit_mb is set to a higher value
+		if systemMemory <= 36*1024*1024*1024 {
+			systemMemory = systemMemory * 2 / 3
+		} else {
+			systemMemory = systemMemory * 3 / 4
+		}
+
+		return systemMemory, nil
 	}
 
 	return 0, fmt.Errorf("no GPU detected") // TODO - better handling of CPU based memory determiniation

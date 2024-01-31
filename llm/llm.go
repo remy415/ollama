@@ -83,7 +83,7 @@ func New(workDir, model string, adapters, projectors []string, opts api.Options)
 			if opts.NumGPU == 0 {
 				break
 			}
-	
+
 			if size+kv+graph > vram {
 				slog.Info("not enough vram available, falling back to CPU only")
 				info.Library = "cpu"
@@ -91,7 +91,7 @@ func New(workDir, model string, adapters, projectors []string, opts api.Options)
 				opts.NumGPU = 0
 				break
 			}
-	
+
 			// TODO: implement layer splitting on Tegra
 			opts.NumGPU = 999
 			break
