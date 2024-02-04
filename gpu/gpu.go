@@ -20,8 +20,6 @@ import (
 	"strings"
 	"sync"
 	"unsafe"
-
-	"github.com/pbnjay/memory"
 )
 
 type handles struct {
@@ -178,10 +176,19 @@ func GetGPUInfo() GpuInfo {
 			}
 		}
 	} else if gpuHandles.tegra != nil {
-		// C.tegra_check_vram(*gpuHandles.tegra, &memInfo) // Tegra is iGPU, should gather data similar to MacOS
+		// Tegra is iGPU and maintains a flexible cache of RAM which should be taken into account.
 		mem, _ := getCPUMem()
-		memInfo.free = C.uint64_t(mem.FreeMemory)
-		memInfo.total = C.uint64_t(mem.TotalMemory)
+		C.tegra_check_vram(*gpuHandles.tegra, &memInfo)
+		if memInfo.err != nil {
+			slog.Info(fmt.Sprintf("error looking up Tegra CUDA GPU memory: %s", C.GoString(memInfo.err)))
+			C.free(unsafe.Pointer(memInfo.err))
+		}
+
+		// Using the greater value of CUDA reported free memory and sysinfo reported free memory.
+		if C.uint64_t(mem.FreeMemory) > memInfo.free {
+			memInfo.free = C.uint64_t(mem.FreeMemory)
+		}
+
 		// Verify minimum compute capability
 		var tcc C.tegra_compute_capability_t
 		C.tegra_compute_capability(*gpuHandles.tegra, &tcc)
@@ -276,18 +283,11 @@ func CheckVRAM() (int64, error) {
 		avail := int64(gpuInfo.FreeMemory - overhead)
 		slog.Debug(fmt.Sprintf("%s detected %d devices with %dM available memory", gpuInfo.Library, gpuInfo.DeviceCount, avail/1024/1024))
 		return avail, nil
-	} else if gpuInfo.FreeMemory > 0 && gpuInfo.Library == "tegra" {
-		// Tegra SOCs are iGPUs and share GPU memory with system memory.
-		systemMemory := int64(memory.TotalMemory())
-
-		// TODO: handle case where iogpu.wired_limit_mb is set to a higher value
-		if systemMemory <= 36*1024*1024*1024 {
-			systemMemory = systemMemory * 2 / 3
-		} else {
-			systemMemory = systemMemory * 3 / 4
-		}
-
-		return systemMemory, nil
+	} else if gpuInfo.FreeMemory > 0 && (gpuInfo.Library == "tegra") {
+		// Assigning full reported free memory; Tegras use a large portion of free memory for cache and will re-allocate it when needed
+		avail := int64(gpuInfo.FreeMemory)
+		slog.Debug(fmt.Sprintf("%s detected %d devices with %dM available memory", gpuInfo.Library, gpuInfo.DeviceCount, avail/1024/1024))
+		return avail, nil
 	}
 
 	return 0, fmt.Errorf("no GPU detected") // TODO - better handling of CPU based memory determiniation
