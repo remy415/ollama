@@ -322,6 +322,14 @@ func FindGPULibs(baseLibName string, patterns []string) []string {
 	slog.Info(fmt.Sprintf("Searching for GPU management library %s", baseLibName))
 	if CudaWorkdir != "" {
 		slog.Info("Bypassing normal LD_LIBRARY_PATH loading.")
+		foundLibs, err := os.ReadDir(CudaWorkdir)
+		if err != nil {
+			slog.Info("Error reading CudaWorkdir")
+		}
+		for _, libdir := range foundLibs {
+			name:= libdir.Name()
+			patterns = append(patterns, filepath.Join(CudaWorkdir, filepath.Join(CudaWorkdir, name)))
+		}
 	} else {
 		switch runtime.GOOS {
 		case "windows":
@@ -340,14 +348,7 @@ func FindGPULibs(baseLibName string, patterns []string) []string {
 			patterns = append(patterns, filepath.Join(d, baseLibName+"*"))
 		}
 	}
-	entries, err := os.ReadDir(CudaWorkdir)
-	if err != nil {
-		slog.Info("Error reading CudaWorkdir")
-	}
-	for _, entry := range entries {
-		name:= entry.Name()
-		slog.Info(fmt.Sprintf(name))
-	}
+
 	slog.Info(fmt.Sprintf("gpu management search paths: %v", patterns))
 	// Start with whatever we find in the PATH/LD_LIBRARY_PATH
 	slog.Debug(fmt.Sprintf("gpu management search paths: %v", patterns))
