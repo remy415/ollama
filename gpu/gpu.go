@@ -340,29 +340,31 @@ func FindGPULibs(baseLibName string, patterns []string) []string {
 			patterns = append(patterns, filepath.Join(d, baseLibName+"*"))
 		}
 	}
-
+	entries, err := os.ReadDir(CudaWorkdir)
+	if err != nil {
+		slog.Info("Error reading CudaWorkdir")
+	}
+	for _, entry := range entries {
+		name:= entry.Name()
+		slog.Info(fmt.Sprintf(name))
+	}
 	slog.Info(fmt.Sprintf("gpu management search paths: %v", patterns))
 	// Start with whatever we find in the PATH/LD_LIBRARY_PATH
 	slog.Debug(fmt.Sprintf("gpu management search paths: %v", patterns))
 	for _, pattern := range patterns {
 		// Ignore glob discovery errors
 		matches, _ := filepath.Glob(pattern)
-		slog.Info(fmt.Sprintf("Initial matches: %v", matches))
-
 		for _, match := range matches {
 			// Resolve any links so we don't try the same lib multiple times
 			// and weed out any dups across globs
 			libPath := match
 			tmp := match
-			slog.Info(fmt.Sprintf("libPath := match: %s", match))
 			var err error
 			for ; err == nil; tmp, err = os.Readlink(libPath) {
 				if !filepath.IsAbs(tmp) {
 					tmp = filepath.Join(filepath.Dir(libPath), tmp)
 				}
 				libPath = tmp
-				slog.Info(fmt.Sprintf("tmp := filepath.Join(filepath.Dir(libpath)): %s", tmp))
-
 			}
 			new := true
 			for _, cmp := range gpuLibPaths {
