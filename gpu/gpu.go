@@ -330,16 +330,18 @@ func FindGPULibs(baseLibName string, patterns []string) []string {
 		default:
 			return gpuLibPaths
 		}
+		
+		for _, ldPath := range ldPaths {
+			d, err := filepath.Abs(ldPath)
+			if err != nil {
+				continue
+			}
+			patterns = append(patterns, filepath.Join(d, baseLibName+"*"))
+		}
 	}
 
+	slog.Info(fmt.Sprintf("gpu management search paths: %v", patterns))
 	// Start with whatever we find in the PATH/LD_LIBRARY_PATH
-	for _, ldPath := range ldPaths {
-		d, err := filepath.Abs(ldPath)
-		if err != nil {
-			continue
-		}
-		patterns = append(patterns, filepath.Join(d, baseLibName+"*"))
-	}
 	slog.Debug(fmt.Sprintf("gpu management search paths: %v", patterns))
 	for _, pattern := range patterns {
 		// Ignore glob discovery errors
