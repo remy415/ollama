@@ -320,13 +320,7 @@ func FindGPULibs(baseLibName string, patterns []string) []string {
 	gpuLibPaths := []string{}
 	slog.Info(fmt.Sprintf("Searching for GPU management library %s", baseLibName))
 	if CudaWorkdir != "" {
-		for _, ldPath := range ldPaths {
-			d, err := filepath.Abs(ldPath)
-			if err != nil {
-				continue
-			}
-			patterns = append(patterns, filepath.Join(d, baseLibName+"*"))
-		}
+		patterns = append(patterns, filepath.Join(CudaWorkdir, baseLibName+"*"))
 	} else {
 		switch runtime.GOOS {
 		case "windows":
