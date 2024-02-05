@@ -325,8 +325,8 @@ func FindGPULibs(baseLibName string, patterns []string) []string {
 			if err != nil {
 				continue
 			}
+			patterns = append(patterns, filepath.Join(d, BaseLibName+"*"))
 		}
-		patterns = append(patterns, filepath.Join(d, BaseLibName+"*"))
 	} else {
 		switch runtime.GOOS {
 		case "windows":
