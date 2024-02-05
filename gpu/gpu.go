@@ -90,7 +90,7 @@ func initGPUHandles() {
 		slog.Info("Loading drivers from package instead of host.")
 		tegraMgmtName = "libcudart.so"
 		tegraMgmtPatterns = make([]string, 0)
-		tegraMgmtPatterns = append(tegraMgmtPatterns, CudaWorkdir)
+		tegraMgmtPatterns = append(tegraMgmtPatterns, filepath.join(CudaWorkdir, tegraMgmtName+"*"))
 	} else {
 		slog.Info("CudaWorkdir not detected. Running standard load.")
 		switch runtime.GOOS {
@@ -320,7 +320,7 @@ func FindGPULibs(baseLibName string, patterns []string) []string {
 	gpuLibPaths := []string{}
 	slog.Info(fmt.Sprintf("Searching for GPU management library %s", baseLibName))
 	if CudaWorkdir != "" {
-		patterns = append(patterns, filepath.Join(CudaWorkdir, baseLibName+"*"))
+		continue
 	} else {
 		switch runtime.GOOS {
 		case "windows":
