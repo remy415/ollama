@@ -109,7 +109,7 @@ func nativeInit(workdir string) error {
 		if err != nil {
 			if err == payloadMissing {
 				// TODO perhaps consider this a hard failure on arm macs?
-				slog.Info("ggml-meta.metal payload missing")
+				slog.Info("ggml-metal.metal payload missing")
 				return nil
 			}
 			return err
@@ -125,6 +125,8 @@ func nativeInit(workdir string) error {
 		}
 		return err
 	}
+	slog.Info(fmt.Sprintf("CudaWorkdir set to %s", workdir))
+	gpu.CudaWorkdir = workdir
 	for _, lib := range libs {
 		// The last dir component is the variant name
 		variant := filepath.Base(filepath.Dir(lib))
