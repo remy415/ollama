@@ -89,7 +89,7 @@ func initGPUHandles() {
 	if CudaWorkdir != "" {
 		slog.Info("Loading drivers from package instead of host.")
 		tegraMgmtName = "libcudart.so"
-		tegraMgmtPatterns = make([string], 1)
+		tegraMgmtPatterns = make([]string, 0)
 		tegraMgmtPatterns = append(tegraMgmtPatterns, CudaWorkdir)
 	} else {
 		slog.Info("CudaWorkdir not detected. Running standard load.")
