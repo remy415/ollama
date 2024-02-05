@@ -121,7 +121,7 @@ func initGPUHandles() {
 		slog.Info(fmt.Sprintf("Using CudaWorkdir path %s in FindGPULibs()", CudaWorkdir))
 		tegraLibPaths := FindGPULibs(tegraMgmtName, tegraMgmtPatterns)
 		if len(tegraLibPaths) > 0 {
-			tegra := LoadTegraMgmt(tegraLibPaths)
+			tegra := LoadTEGRAMgmt(tegraLibPaths)
 			if tegra != nil {
 				slog.Info("Nvidia Tegra SOC detected")
 				gpuHandles.tegra = tegra
@@ -325,7 +325,7 @@ func FindGPULibs(baseLibName string, patterns []string) []string {
 			if err != nil {
 				continue
 			}
-			patterns = append(patterns, filepath.Join(d, BaseLibName+"*"))
+			patterns = append(patterns, filepath.Join(d, baseLibName+"*"))
 		}
 	} else {
 		switch runtime.GOOS {
