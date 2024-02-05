@@ -117,26 +117,38 @@ func initGPUHandles() {
 	}
 
 	slog.Info("Detecting GPU type")
-	cudaLibPaths := FindGPULibs(cudaMgmtName, cudaMgmtPatterns)
-	if len(cudaLibPaths) > 0 {
-		cuda := LoadCUDAMgmt(cudaLibPaths)
-		if cuda != nil {
-			slog.Info("Nvidia GPU detected")
-			gpuHandles.cuda = cuda
-			return
+	if CudaWorkdir != "" {
+		slog.Info(fmt.Sprintf("Using CudaWorkdir path %s in FindGPULibs()", CudaWorkdir))
+		tegraLibPaths := FindGPULibs(tegraMgmtName, tegraMgmtPatterns)
+		if len(tegraLibPaths) > 0 {
+			tegra := LoadTegraMgmt(tegraLibPaths)
+			if tegra != nil {
+				slog.Info("Nvidia Tegra SOC detected")
+				gpuHandles.tegra = tegra
+				return
+			}
 		}
-	}
-
-	tegraLibPaths := FindGPULibs(tegraMgmtName, tegraMgmtPatterns)
-	if CudaTegra != "" && len(tegraLibPaths) > 0 {
-		tegra := LoadTEGRAMgmt(tegraLibPaths)
-		if tegra != nil {
-			slog.Info("Nvidia Tegra SOC detected")
-			gpuHandles.tegra = tegra
-			return
+	} else {
+		cudaLibPaths := FindGPULibs(cudaMgmtName, cudaMgmtPatterns)
+		if len(cudaLibPaths) > 0 {
+			cuda := LoadCUDAMgmt(cudaLibPaths)
+			if cuda != nil {
+				slog.Info("Nvidia GPU detected")
+				gpuHandles.cuda = cuda
+				return
+			}
 		}
-	}
 
+		tegraLibPaths := FindGPULibs(tegraMgmtName, tegraMgmtPatterns)
+		if CudaTegra != "" && len(tegraLibPaths) > 0 {
+			tegra := LoadTEGRAMgmt(tegraLibPaths)
+			if tegra != nil {
+				slog.Info("Nvidia Tegra SOC detected")
+				gpuHandles.tegra = tegra
+				return
+			}
+		}
+}
 	rocmLibPaths := FindGPULibs(rocmMgmtName, rocmMgmtPatterns)
 	if len(rocmLibPaths) > 0 {
 		rocm := LoadROCMMgmt(rocmLibPaths)
@@ -307,15 +319,19 @@ func FindGPULibs(baseLibName string, patterns []string) []string {
 	var ldPaths []string
 	gpuLibPaths := []string{}
 	slog.Info(fmt.Sprintf("Searching for GPU management library %s", baseLibName))
-
-	switch runtime.GOOS {
-	case "windows":
-		ldPaths = strings.Split(os.Getenv("PATH"), ";")
-	case "linux":
-		ldPaths = strings.Split(os.Getenv("LD_LIBRARY_PATH"), ":")
-	default:
-		return gpuLibPaths
+	if CudaWorkdir != "" {
+		ldPaths = patterns[0]
+	} else {
+		switch runtime.GOOS {
+		case "windows":
+			ldPaths = strings.Split(os.Getenv("PATH"), ";")
+		case "linux":
+			ldPaths = strings.Split(os.Getenv("LD_LIBRARY_PATH"), ":")
+		default:
+			return gpuLibPaths
+		}
 	}
+
 	// Start with whatever we find in the PATH/LD_LIBRARY_PATH
 	for _, ldPath := range ldPaths {
 		d, err := filepath.Abs(ldPath)
