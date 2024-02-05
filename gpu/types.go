@@ -10,6 +10,7 @@ type memInfo struct {
 type GpuInfo struct {
 	memInfo
 	Library string `json:"library,omitempty"`
+	LibraryPath string `json:"library_path,omitempty"`
 
 	// Optional variant to select (e.g. versions, cpu feature flags)
 	Variant string `json:"variant,omitempty"`
