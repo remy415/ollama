@@ -70,8 +70,9 @@ var RocmWindowsGlobs = []string{
 }
 
 // Jetson devices have JETSON_JETPACK="x.y.z" factory set to the Jetpack version installed.
-
+// Testing CudaWorkDirs
 var CudaTegra string = os.Getenv("JETSON_JETPACK")
+var CudaWorkdir string
 
 // Note: gpuMutex must already be held
 func initGPUHandles() {
@@ -85,26 +86,34 @@ func initGPUHandles() {
 	var rocmMgmtPatterns []string
 	var tegraMgmtName string
 	var tegraMgmtPatterns []string
-	switch runtime.GOOS {
-	case "windows":
-		cudaMgmtName = "nvml.dll"
-		cudaMgmtPatterns = make([]string, len(CudaWindowsGlobs))
-		copy(cudaMgmtPatterns, CudaWindowsGlobs)
-		rocmMgmtName = "rocm_smi64.dll"
-		rocmMgmtPatterns = make([]string, len(RocmWindowsGlobs))
-		copy(rocmMgmtPatterns, RocmWindowsGlobs)
-	case "linux":
-		cudaMgmtName = "libnvidia-ml.so"
-		cudaMgmtPatterns = make([]string, len(CudaLinuxGlobs))
-		copy(cudaMgmtPatterns, CudaLinuxGlobs)
+	if CudaWorkdir != "" {
+		slog.Info("Loading drivers from package instead of host.")
 		tegraMgmtName = "libcudart.so"
-		tegraMgmtPatterns = make([]string, len(TegraLinuxGlobs))
-		copy(tegraMgmtPatterns, TegraLinuxGlobs)
-		rocmMgmtName = "librocm_smi64.so"
-		rocmMgmtPatterns = make([]string, len(RocmLinuxGlobs))
-		copy(rocmMgmtPatterns, RocmLinuxGlobs)
-	default:
-		return
+		tegraMgmtPatterns = make([string], 0)
+		tegraMgmtPatterns = append(tegraMgmtPatterns, CudaWorkdir)
+	} else {
+		slog.Info("CudaWorkdir not detected. Running standard load.")
+		switch runtime.GOOS {
+		case "windows":
+			cudaMgmtName = "nvml.dll"
+			cudaMgmtPatterns = make([]string, len(CudaWindowsGlobs))
+			copy(cudaMgmtPatterns, CudaWindowsGlobs)
+			rocmMgmtName = "rocm_smi64.dll"
+			rocmMgmtPatterns = make([]string, len(RocmWindowsGlobs))
+			copy(rocmMgmtPatterns, RocmWindowsGlobs)
+		case "linux":
+			cudaMgmtName = "libnvidia-ml.so"
+			cudaMgmtPatterns = make([]string, len(CudaLinuxGlobs))
+			copy(cudaMgmtPatterns, CudaLinuxGlobs)
+			tegraMgmtName = "libcudart.so"
+			tegraMgmtPatterns = make([]string, len(TegraLinuxGlobs))
+			copy(tegraMgmtPatterns, TegraLinuxGlobs)
+			rocmMgmtName = "librocm_smi64.so"
+			rocmMgmtPatterns = make([]string, len(RocmLinuxGlobs))
+			copy(rocmMgmtPatterns, RocmLinuxGlobs)
+		default:
+			return
+		}
 	}
 
 	slog.Info("Detecting GPU type")

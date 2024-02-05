@@ -44,6 +44,7 @@ func New(workDir, model string, adapters, projectors []string, opts api.Options)
 		opts.NumCtx = 4
 	}
 
+	gpu.CudaWorkdir = workDir
 	vram, _ := gpu.CheckVRAM()
 	size := ggml.Size
 
