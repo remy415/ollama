@@ -69,11 +69,12 @@ void cuda_init(char *cuda_lib_path, cuda_init_resp_t *resp) {
       return;
     }
   }
-
+  
+  cudartReturn_t cudart_ret;
+  nvmlReturn_t nvml_ret;
+  
   // Trying libcudart.so first, fallback to nvml
   if (resp->ch.cudaSetDevice != NULL) {
-    cudartReturn_t cudart_ret;
-    cudartDriverVersion_t driverVersion;
     cudart_ret = (*resp->ch.cudaSetDevice)(0);
     if (cudart_ret != CUDART_SUCCESS) {
       LOG(resp->ch.verbose, "cudaSetDevice err: %d\n", cudart_ret);
@@ -85,7 +86,6 @@ void cuda_init(char *cuda_lib_path, cuda_init_resp_t *resp) {
     }
     resp->ch.lib_t = LIBCUDART;
   } else if (resp->ch.nvmlInit_v2 != NULL) {
-    nvmlReturn_t nvml_ret;
     nvml_ret = (*resp->ch.nvmlInit_v2)();
     if (nvml_ret != NVML_SUCCESS) {
       LOG(resp->ch.verbose, "nvmlInit_v2 err: %d\n", nvml_ret);
@@ -100,6 +100,7 @@ void cuda_init(char *cuda_lib_path, cuda_init_resp_t *resp) {
 
   switch (resp->ch.lib_t) {
     case LIBCUDART:
+      cudartDriverVersion_t driverVersion;
       // Report driver version if we're in verbose mode, ignore errors
       version = 0;
       driverVersion.major = 0;
