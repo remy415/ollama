@@ -171,7 +171,7 @@ void cuda_check_vram(cuda_handle_t h, mem_info_t *resp) {
           return;
         }
         LOG(h.verbose, "[%d] CUDA totalMem %ld\n", i, cudart_memInfo.total);
-        LOG(h.verbose, "[%d] CUDA usedMem %ld\n", i, cudart_memInfo.free);
+        LOG(h.verbose, "[%d] CUDA usedMem %ld\n", i, (cudart_memInfo.total - cudart_memInfo.free));
 
         resp->total += cudart_memInfo.total;
         resp->free += cudart_memInfo.free;
@@ -241,7 +241,7 @@ void cuda_check_vram(cuda_handle_t h, mem_info_t *resp) {
         }
 
         LOG(h.verbose, "[%d] CUDA totalMem %ld\n", i, nvml_memInfo.total);
-        LOG(h.verbose, "[%d] CUDA usedMem %ld\n", i, nvml_memInfo.free);
+        LOG(h.verbose, "[%d] CUDA usedMem %ld\n", i, (nvml_memInfo.total - nvml_memInfo.free));
 
         resp->total += nvml_memInfo.total;
         resp->free += nvml_memInfo.free;
