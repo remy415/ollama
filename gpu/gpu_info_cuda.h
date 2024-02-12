@@ -20,6 +20,11 @@ typedef enum cudaLibraryType_enum
   LIBNVIDIAML,
 } cudaLibraryType_t;
 
+typedef enum cudaDeviceAttr_enum {
+  cudaDevAttrComputeCapabilityMajor = 75,
+  cudaDevAttrComputeCapabilityMinor = 76,
+} cudaDeviceAttr_t;
+
 typedef void *nvmlDevice_t;  // Opaque is sufficient
 typedef struct nvmlMemory_st {
   unsigned long long total;
