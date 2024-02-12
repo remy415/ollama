@@ -8,12 +8,35 @@ typedef enum nvmlReturn_enum {
   NVML_SUCCESS = 0,
   // Other values omitted for now...
 } nvmlReturn_t;
+
+typedef enum cudartReturn_enum {
+  CUDART_SUCCESS = 0,
+} cudartReturn_t;
+
+typedef enum cudaLibraryType_enum
+{
+  LIBUNKNOWN,
+  LIBCUDART,
+  LIBNVIDIAML,
+} cudaLibraryType_t;
+
 typedef void *nvmlDevice_t;  // Opaque is sufficient
 typedef struct nvmlMemory_st {
   unsigned long long total;
   unsigned long long free;
   unsigned long long used;
 } nvmlMemory_t;
+
+typedef struct cudartMemory_st {
+  unsigned long long total;
+  unsigned long long free;
+  unsigned long long used;
+} cudartMemory_t;
+
+typedef struct cudartDriverVersion {
+  int major;
+  int minor;
+} cudartDriverVersion_t;
 
 typedef enum nvmlBrandType_enum
 {
@@ -23,6 +46,7 @@ typedef enum nvmlBrandType_enum
 typedef struct cuda_handle {
   void *handle;
   uint16_t verbose;
+  cudaLibraryType_t lib_t;
   nvmlReturn_t (*nvmlInit_v2)(void);
   nvmlReturn_t (*nvmlShutdown)(void);
   nvmlReturn_t (*nvmlDeviceGetHandleByIndex)(unsigned int, nvmlDevice_t *);
@@ -35,6 +59,12 @@ typedef struct cuda_handle {
   nvmlReturn_t (*nvmlDeviceGetVbiosVersion) (nvmlDevice_t device, char* version, unsigned int  length);
   nvmlReturn_t (*nvmlDeviceGetBoardPartNumber) (nvmlDevice_t device, char* partNumber, unsigned int  length);
   nvmlReturn_t (*nvmlDeviceGetBrand) (nvmlDevice_t device, nvmlBrandType_t* type);
+  cudartReturn_t (*cudaSetDevice)(int device);
+  cudartReturn_t (*cudaDeviceReset)(void);
+  cudartReturn_t (*cudaMemGetInfo)(size_t *, size_t *);
+  cudartReturn_t (*cudaGetDeviceCount)(int *);
+  cudartReturn_t (*cudaDeviceGetAttribute)(int* value, cudaDeviceAttr_t attr, int device);
+  cudartReturn_t (*cudaDriverGetVersion) (int *driverVersion);
 } cuda_handle_t;
 
 typedef struct cuda_init_resp {
