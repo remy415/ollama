@@ -27,6 +27,7 @@ type handles struct {
 	rocm *C.rocm_handle_t
 }
 
+// Enum to keep track of which CUDA library is used
 const (
 	LibUnknown = iota
 	LibCUDART
@@ -89,6 +90,8 @@ var RocmLinuxGlobs = []string{
 var RocmWindowsGlobs = []string{
 	"c:\\Windows\\System32\\rocm_smi64.dll",
 }
+
+var CudaTegra string = os.Getenv("JETSON_JETPACK")
 
 // Note: gpuMutex must already be held
 func initGPUHandles() {
@@ -277,6 +280,9 @@ func CheckVRAM() (int64, error) {
 			overhead = gpus * 1024 * 1024 * 1024
 		}
 		avail := int64(gpuInfo.FreeMemory - overhead)
+		if (gpuInfo.Library == "cuda" && CudaTegra != "") {
+			avail = int64(gpuInfo.FreeMemory)
+		}
 		slog.Debug(fmt.Sprintf("%s detected %d devices with %dM available memory", gpuInfo.Library, gpuInfo.DeviceCount, avail/1024/1024))
 		return avail, nil
 	}
