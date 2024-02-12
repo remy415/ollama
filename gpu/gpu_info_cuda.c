@@ -98,9 +98,9 @@ void cuda_init(char *cuda_lib_path, cuda_init_resp_t *resp) {
     resp->ch.lib_t = LIBNVIDIAML;
   }
 
+  cudartDriverVersion_t driverVersion;
   switch (resp->ch.lib_t) {
     case LIBCUDART:
-      cudartDriverVersion_t driverVersion;
       // Report driver version if we're in verbose mode, ignore errors
       version = 0;
       driverVersion.major = 0;
@@ -135,6 +135,9 @@ void cuda_check_vram(cuda_handle_t h, mem_info_t *resp) {
   const int buflen = 256;
   char buf[buflen + 1];
   int i;
+  cudartReturn_t cudart_ret;
+  nvmlDevice_t device;
+  nvmlReturn_t nvml_ret;
 
   if (h.handle == NULL) {
     resp->err = strdup("cuda and nvml handle isn't initialized");
@@ -144,7 +147,6 @@ void cuda_check_vram(cuda_handle_t h, mem_info_t *resp) {
   switch (h.lib_t) {
     case LIBCUDART:
       cudartMemory_t cudart_memInfo = {0};
-      cudartReturn_t cudart_ret;
       cudart_ret = (*h.cudaGetDeviceCount)(&resp->count);
       if (cudart_ret != CUDART_SUCCESS) {
         snprintf(buf, buflen, "unable to get device count: %d", cudart_ret);
@@ -177,9 +179,7 @@ void cuda_check_vram(cuda_handle_t h, mem_info_t *resp) {
       break;
     
     case LIBNVIDIAML:
-      nvmlDevice_t device;
       nvmlMemory_t nvml_memInfo = {0};
-      nvmlReturn_t nvml_ret;
       nvml_ret = (*h.nvmlDeviceGetCount_v2)(&resp->count);
       if (nvml_ret != NVML_SUCCESS) {
         snprintf(buf, buflen, "unable to get device count: %d", nvml_ret);
@@ -262,6 +262,9 @@ void cuda_compute_capability(cuda_handle_t h, cuda_compute_capability_t *resp) {
   resp->err = NULL;
   resp->major = 0;
   resp->minor = 0;
+  cudartReturn_t cudart_ret;
+  nvmlDevice_t device;
+  nvmlReturn_t nvml_ret;
   int major = 0;
   int minor = 0;
   const int buflen = 256;
@@ -275,10 +278,7 @@ void cuda_compute_capability(cuda_handle_t h, cuda_compute_capability_t *resp) {
 
   switch (h.lib_t) {
     case LIBNVIDIAML:
-      nvmlDevice_t device;
-      nvmlReturn_t nvml_ret;
       unsigned int devices;
-
       nvml_ret = (*h.nvmlDeviceGetCount_v2)(&devices);
       if (nvml_ret != NVML_SUCCESS) {
         snprintf(buf, buflen, "unable to get device count: %d", nvml_ret);
@@ -310,7 +310,6 @@ void cuda_compute_capability(cuda_handle_t h, cuda_compute_capability_t *resp) {
       }
       break;
     case LIBCUDART:
-      cudartReturn_t cudart_ret;
       int devices;
       cudart_ret = (*h.cudaGetDeviceCount)(&devices);
       if (cudart_ret != CUDART_SUCCESS) {
