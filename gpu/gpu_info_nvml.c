@@ -1,6 +1,6 @@
 #ifndef __APPLE__  // TODO - maybe consider nvidia support on intel macs?
 
-#include "gpu_info_cuda.h"
+#include "gpu_info_nvml.h"
 
 #include <string.h>
 

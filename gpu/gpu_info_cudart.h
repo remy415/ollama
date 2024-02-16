@@ -1,6 +1,6 @@
 #ifndef __APPLE__
-#ifndef __GPU_INFO_TEGRA_H__
-#define __GPU_INFO_TEGRA_H__
+#ifndef __GPU_INFO_CUDART_H__
+#define __GPU_INFO_CUDART_H__
 #include "gpu_info.h"
 
 // Just enough typedef's to dlopen/dlsym for memory information
