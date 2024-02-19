@@ -375,7 +375,7 @@ func LoadNVMLMgmt(nvmlLibPaths []string) *C.nvml_handle_t {
 
 func LoadCUDARTMgmt(cudartLibPaths []string) *C.cudart_handle_t {
 	var resp C.cudart_init_resp_t
-	resp.th.verbose = getVerboseState()
+	resp.ch.verbose = getVerboseState()
 	for _, libPath := range cudartLibPaths {
 		lib := C.CString(libPath)
 		defer C.free(unsafe.Pointer(lib))
@@ -384,7 +384,7 @@ func LoadCUDARTMgmt(cudartLibPaths []string) *C.cudart_handle_t {
 			slog.Info(fmt.Sprintf("Unable to load cudart CUDA management library %s: %s", libPath, C.GoString(resp.err)))
 			C.free(unsafe.Pointer(resp.err))
 		} else {
-			return &resp.th
+			return &resp.ch
 		}
 	}
 	return nil
