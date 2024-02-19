@@ -36,6 +36,7 @@ typedef struct cudart_handle {
   void *handle;
   uint16_t verbose;
   cudartReturn_t (*cudaSetDevice)(int device);
+  cudartReturn_t (*cudaDeviceSynchronize)(void);
   cudartReturn_t (*cudaDeviceReset)(void);
   cudartReturn_t (*cudaMemGetInfo)(size_t *, size_t *);
   cudartReturn_t (*cudaGetDeviceCount)(int *);
