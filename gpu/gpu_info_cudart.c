@@ -1,10 +1,10 @@
 #ifndef __APPLE__  // TODO - maybe consider nvidia support on intel macs?
 
 #include <string.h>
-#include "gpu_info_tegra.h"
+#include "gpu_info_cudart.h"
 
-void tegra_init(char *tegra_lib_path, tegra_init_resp_t *resp) {
-  tegraReturn_t ret;
+void cudart_init(char *cudart_lib_path, cudart_init_resp_t *resp) {
+  cudartReturn_t ret;
   resp->err = NULL;
   const int buflen = 256;
   char buf[buflen + 1];
@@ -14,40 +14,40 @@ void tegra_init(char *tegra_lib_path, tegra_init_resp_t *resp) {
     char *s;
     void **p;
   } l[] = {
-      {"cudaSetDevice", (void *)&resp->th.cudaSetDevice},
-      {"cudaDeviceReset", (void *)&resp->th.cudaDeviceReset},
-      {"cudaMemGetInfo", (void *)&resp->th.cudaMemGetInfo},
-      {"cudaGetDeviceCount", (void *)&resp->th.cudaGetDeviceCount},
-      {"cudaDeviceGetAttribute", (void *)&resp->th.cudaDeviceGetAttribute},
-      {"cudaDriverGetVersion", (void *)&resp->th.cudaDriverGetVersion},
+      {"cudaSetDevice", (void *)&resp->ch.cudaSetDevice},
+      {"cudaDeviceReset", (void *)&resp->ch.cudaDeviceReset},
+      {"cudaMemGetInfo", (void *)&resp->ch.cudaMemGetInfo},
+      {"cudaGetDeviceCount", (void *)&resp->ch.cudaGetDeviceCount},
+      {"cudaDeviceGetAttribute", (void *)&resp->ch.cudaDeviceGetAttribute},
+      {"cudaDriverGetVersion", (void *)&resp->ch.cudaDriverGetVersion},
       {NULL, NULL},
   };
 
-  resp->th.handle = LOAD_LIBRARY(tegra_lib_path, RTLD_LAZY);
-  if (!resp->th.handle) {
+  resp->ch.handle = LOAD_LIBRARY(cudart_lib_path, RTLD_LAZY);
+  if (!resp->ch.handle) {
     char *msg = LOAD_ERR();
-    LOG(resp->th.verbose, "library %s load err: %s\n", tegra_lib_path, msg);
+    LOG(resp->ch.verbose, "library %s load err: %s\n", cudart_lib_path, msg);
     snprintf(buf, buflen,
-            "Unable to load %s library to query for Nvidia Tegra GPUs: %s",
-            tegra_lib_path, msg);
+            "Unable to load %s library to query for Nvidia GPUs: %s",
+            cudart_lib_path, msg);
     free(msg);
     resp->err = strdup(buf);
     return;
   }
 
   // TODO once we've squashed the remaining corner cases remove this log
-  LOG(resp->th.verbose, "wiring nvidia/tegra management library functions in %s\n", tegra_lib_path);
+  LOG(resp->ch.verbose, "wiring cudart library functions in %s\n", cudart_lib_path);
   
   for (i = 0; l[i].s != NULL; i++) {
     // TODO once we've squashed the remaining corner cases remove this log
-    LOG(resp->th.verbose, "dlsym: %s\n", l[i].s);
+    LOG(resp->ch.verbose, "dlsym: %s\n", l[i].s);
 
-    *l[i].p = LOAD_SYMBOL(resp->th.handle, l[i].s);
+    *l[i].p = LOAD_SYMBOL(resp->ch.handle, l[i].s);
     if (!l[i].p) {
       char *msg = LOAD_ERR();
-      LOG(resp->th.verbose, "dlerr: %s\n", msg);
-      UNLOAD_LIBRARY(resp->th.handle);
-      resp->th.handle = NULL;
+      LOG(resp->ch.verbose, "dlerr: %s\n", msg);
+      UNLOAD_LIBRARY(resp->ch.handle);
+      resp->ch.handle = NULL;
       snprintf(buf, buflen, "symbol lookup for %s failed: %s", l[i].s,
               msg);
       free(msg);
@@ -56,48 +56,50 @@ void tegra_init(char *tegra_lib_path, tegra_init_resp_t *resp) {
     }
   }
 
-  ret = (*resp->th.cudaSetDevice)(0);
-  if (ret != TEGRA_SUCCESS) {
-    LOG(resp->th.verbose, "cudaSetDevice(0) err: %d\n", ret);
-    UNLOAD_LIBRARY(resp->th.handle);
-    resp->th.handle = NULL;
+  ret = (*resp->ch.cudaSetDevice)(0);
+  if (ret != CUDART_SUCCESS) {
+    LOG(resp->ch.verbose, "cudaSetDevice(0) err: %d\n", ret);
+    UNLOAD_LIBRARY(resp->ch.handle);
+    resp->ch.handle = NULL;
     snprintf(buf, buflen, "cuda runtime api init failure: %d", ret);
     resp->err = strdup(buf);
     return;
   }
 
   int version = 0;
-  tegraDriverVersion_t driverVersion;
+  cudartDriverVersion_t driverVersion;
   driverVersion.major = 0;
   driverVersion.minor = 0;
 
   // Report driver version if we're in verbose mode, ignore errors
-  ret = (*resp->th.cudaDriverGetVersion)(&version);
-  if (ret != TEGRA_SUCCESS) {
-    LOG(resp->th.verbose, "cudaDriverGetVersion failed: %d\n", ret);
+  ret = (*resp->ch.cudaDriverGetVersion)(&version);
+  if (ret != CUDART_SUCCESS) {
+    LOG(resp->ch.verbose, "cudaDriverGetVersion failed: %d\n", ret);
   } else {
     driverVersion.major = version / 1000;
     driverVersion.minor = (version - (driverVersion.major * 1000)) / 10;
-    LOG(resp->th.verbose, "CUDA driver version: %d-%d\n", driverVersion.major, driverVersion.minor);
+    LOG(resp->ch.verbose, "CUDA driver version: %d-%d\n", driverVersion.major, driverVersion.minor);
   }
 }
 
-void tegra_check_vram(tegra_handle_t th, mem_info_t *resp) {
+
+void cudart_check_vram(cudart_handle_t h, mem_info_t *resp) {
   resp->err = NULL;
-  tegraMemory_t memInfo = {0};
-  tegraReturn_t ret;
+  cudartMemory_t memInfo = {0};
+  cudartReturn_t ret;
   const int buflen = 256;
   char buf[buflen + 1];
   int i;
 
-  if (th.handle == NULL) {
-    resp->err = strdup("tegra handle isn't initialized");
+  if (h.handle == NULL) {
+    resp->err = strdup("cudart handle isn't initialized");
     return;
   }
 
+  // cudaGetDeviceCount takes int type, resp-> count is uint
   int deviceCount;
-  ret = (*th.cudaGetDeviceCount)(&deviceCount);
-  if (ret != TEGRA_SUCCESS) {
+  ret = (*h.cudaGetDeviceCount)(&deviceCount);
+  if (ret != CUDART_SUCCESS) {
     snprintf(buf, buflen, "unable to get device count: %d", ret);
     resp->err = strdup(buf);
     return;
@@ -107,97 +109,102 @@ void tegra_check_vram(tegra_handle_t th, mem_info_t *resp) {
 
   resp->total = 0;
   resp->free = 0;
+  for (i = 0; i < resp-> count; i++) {  
+    ret = (*h.cudaSetDevice)(i);
+    ret = (*h.cudaMemGetInfo)(&resp->free, &resp->total);
+    if (ret != CUDART_SUCCESS) {
+      snprintf(buf, buflen, "cudart device memory info lookup failure %d", ret);
+      resp->err = strdup(buf);
+      return;
+    }
 
-  ret = (*th.cudaMemGetInfo)(&resp->free, &resp->total);
-  if (ret != TEGRA_SUCCESS) {
-    snprintf(buf, buflen, "tegra device memory info lookup failure %d", ret);
-    resp->err = strdup(buf);
-    return;
+    if (h.verbose) {
+      cudartBrandType_t brand = 0;
+      // When in verbose mode, report more information about
+      // the card we discover, but don't fail on error
+      // Need to map out alternatives of these for CUDART libraries
+      // For now just returning an
+      ret = CUDART_UNSUPPORTED;
+      if (ret != CUDART_SUCCESS) {
+        LOG(h.verbose, "nvmlDeviceGetName unsupported with CUDART libraries: %d\n", ret);
+      } else {
+        LOG(h.verbose, "[%d] CUDA device name: %s\n", i, buf);
+      }
+      if (ret != CUDART_SUCCESS) {
+        LOG(h.verbose, "nvmlDeviceGetBoardPartNumber unsupported with CUDART libraries: %d\n", ret);
+      } else {
+        LOG(h.verbose, "[%d] CUDA part number: %s\n", i, buf);
+      }
+      if (ret != CUDART_SUCCESS) {
+        LOG(h.verbose, "nvmlDeviceGetSerial unsupported with CUDART libraries: %d\n", ret);
+      } else {
+        LOG(h.verbose, "[%d] CUDA S/N: %s\n", i, buf);
+      }
+      if (ret != CUDART_SUCCESS) {
+        LOG(h.verbose, "nvmlDeviceGetVbiosVersion unsupported with CUDART libraries: %d\n", ret);
+      } else {
+        LOG(h.verbose, "[%d] CUDA vbios version: %s\n", i, buf);
+      }
+      if (ret != CUDART_SUCCESS) {
+        LOG(h.verbose, "nvmlDeviceGetBrand unsupported with CUDART libraries: %d\n", ret);
+      } else {
+        LOG(h.verbose, "[%d] CUDA brand: %d\n", i, brand);
+      }
+    }
+
+    LOG(h.verbose, "[%d] CUDA totalMem %ld\n", i, resp->total);
+    LOG(h.verbose, "[%d] CUDA freeMem %ld\n", i, resp->free);
+
+    resp->total += memInfo.total;
+    resp->free += memInfo.free;
   }
-
-  if (th.verbose) {
-    tegraBrandType_t brand = 0;
-    // When in verbose mode, report more information about
-    // the card we discover, but don't fail on error
-    ret = TEGRA_UNSUPPORTED;
-    if (ret != TEGRA_SUCCESS) {
-      LOG(th.verbose, "nvmlDeviceGetName unsupported on Tegra: %d\n", ret);
-    } else {
-      LOG(th.verbose, "[%d] CUDA device name: %s\n", i, buf);
-    }
-    if (ret != TEGRA_SUCCESS) {
-      LOG(th.verbose, "nvmlDeviceGetBoardPartNumber unsupported on Tegra: %d\n", ret);
-    } else {
-      LOG(th.verbose, "[%d] CUDA part number: %s\n", i, buf);
-    }
-    if (ret != TEGRA_SUCCESS) {
-      LOG(th.verbose, "nvmlDeviceGetSerial unsupported on Tegra: %d\n", ret);
-    } else {
-      LOG(th.verbose, "[%d] CUDA S/N: %s\n", i, buf);
-    }
-    if (ret != TEGRA_SUCCESS) {
-      LOG(th.verbose, "nvmlDeviceGetVbiosVersion unsupported on Tegra: %d\n", ret);
-    } else {
-      LOG(th.verbose, "[%d] CUDA vbios version: %s\n", i, buf);
-    }
-    if (ret != TEGRA_SUCCESS) {
-      LOG(th.verbose, "nvmlDeviceGetBrand unsupported on Tegra: %d\n", ret);
-    } else {
-      LOG(th.verbose, "[%d] CUDA brand: %d\n", i, brand);
-    }
-  }
-
-  LOG(th.verbose, "[%d] CUDA totalMem %ld\n", i, resp->total);
-  LOG(th.verbose, "[%d] CUDA freeMem %ld\n", i, resp->free);
-
 }
 
-void tegra_compute_capability(tegra_handle_t th, tegra_compute_capability_t *resp) {
+void cudart_compute_capability(cudart_handle_t h, cudart_compute_capability_t *resp) {
   resp->err = NULL;
   resp->major = 0;
   resp->minor = 0;
-  tegraReturn_t ret;
+  int major = 0;
+  int minor = 0;
+  cudartReturn_t ret;
   const int buflen = 256;
   char buf[buflen + 1];
+  int i;
 
-  if (th.handle == NULL) {
-    resp->err = strdup("tegra handle not initialized");
+  if (h.handle == NULL) {
+    resp->err = strdup("cudart handle not initialized");
     return;
   }
 
   int devices;
-  ret = (*th.cudaGetDeviceCount)(&devices);
-  if (ret != TEGRA_SUCCESS) {
-    snprintf(buf, buflen, "unable to get tegra device count: %d", ret);
+  ret = (*h.cudaGetDeviceCount)(&devices);
+  if (ret != CUDART_SUCCESS) {
+    snprintf(buf, buflen, "unable to get cudart device count: %d", ret);
     resp->err = strdup(buf);
     return;
   }
 
-  int devId = 0; // Tegra device id is always 0
-  int major = 0;
-  int minor = 0;
-
-  ret = (*th.cudaDeviceGetAttribute)(&major, cudaDevAttrComputeCapabilityMajor, devId);
-  if (ret != TEGRA_SUCCESS) {
-    snprintf(buf, buflen, "device compute capability lookup failure %d: %d", devId, ret);
-    resp->err = strdup(buf);
-    return;
-  }
-  ret = (*th.cudaDeviceGetAttribute)(&minor, cudaDevAttrComputeCapabilityMinor, devId);
-  if (ret != TEGRA_SUCCESS) {
-    snprintf(buf, buflen, "device compute capability lookup failure %d: %d", devId, ret);
-    resp->err = strdup(buf);
-    return;
-  }
- 
-  LOG(th.verbose, "Tegra Compute Capability version: %d.%d\n", major, minor);
-  
-  // Report the lowest major.minor we detect as that limits our compatibility
-  if (resp->major == 0 || resp->major > major ) {
-    resp->major = major;
-    resp->minor = minor;
-  } else if ( resp->major == major && resp->minor > minor ) {
-    resp->minor = minor;
+  for (i = 0; i < devices; i++) {
+    ret = (*h.cudaDeviceGetAttribute)(&major, cudartDevAttrComputeCapabilityMajor, i);
+    if (ret != CUDART_SUCCESS) {
+      snprintf(buf, buflen, "device compute capability lookup failure %d: %d", i, ret);
+      resp->err = strdup(buf);
+      return;
+    }
+    ret = (*h.cudaDeviceGetAttribute)(&minor, cudartDevAttrComputeCapabilityMinor, i);
+    if (ret != CUDART_SUCCESS) {
+      snprintf(buf, buflen, "device compute capability lookup failure %d: %d", i, ret);
+      resp->err = strdup(buf);
+      return;
+    }
+      
+    // Report the lowest major.minor we detect as that limits our compatibility
+    if (resp->major == 0 || resp->major > major ) {
+      resp->major = major;
+      resp->minor = minor;
+    } else if ( resp->major == major && resp->minor > minor ) {
+      resp->minor = minor;
+    }
   }
 }
 
