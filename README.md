@@ -10,16 +10,16 @@ Get up and running with large language models locally.
 
 ### macOS
 
-[Download](https://ollama.ai/download/Ollama-darwin.zip)
+[Download](https://ollama.com/download/Ollama-darwin.zip)
 
-### Windows
+### Windows preview
 
-Coming soon! For now, you can install Ollama on Windows via WSL2.
+[Download](https://ollama.com/download/OllamaSetup.exe)
 
-### Linux & WSL2
+### Linux
 
 ```
-curl https://ollama.ai/install.sh | sh
+curl -fsSL https://ollama.com/install.sh | sh
 ```
 
 [Manual install instructions](https://github.com/jmorganca/ollama/blob/main/docs/linux.md)
@@ -35,7 +35,7 @@ The official [Ollama Docker image](https://hub.docker.com/r/ollama/ollama) `olla
 
 ## Quickstart
 
-To run and chat with [Llama 2](https://ollama.ai/library/llama2):
+To run and chat with [Llama 2](https://ollama.com/library/llama2):
 
 ```
 ollama run llama2
@@ -43,7 +43,7 @@ ollama run llama2
 
 ## Model library
 
-Ollama supports a list of open-source models available on [ollama.ai/library](https://ollama.ai/library 'ollama model library')
+Ollama supports a list of open-source models available on [ollama.com/library](https://ollama.com/library 'ollama model library')
 
 Here are some example open-source models that can be downloaded:
 
@@ -262,7 +262,7 @@ See the [API documentation](./docs/api.md) for all endpoints.
 - [Chatbot UI](https://github.com/ivanfioravanti/chatbot-ollama)
 - [Typescript UI](https://github.com/ollama-interface/Ollama-Gui?tab=readme-ov-file)
 - [Minimalistic React UI for Ollama Models](https://github.com/richawo/minimal-llm-ui)
-- [Web UI](https://github.com/ollama-webui/ollama-webui)
+- [Open WebUI](https://github.com/open-webui/open-webui)
 - [Ollamac](https://github.com/kevinhermawan/Ollamac)
 - [big-AGI](https://github.com/enricoros/big-agi/blob/main/docs/config-ollama.md)
 - [Cheshire Cat assistant framework](https://github.com/cheshire-cat-ai/core)
@@ -310,6 +310,7 @@ See the [API documentation](./docs/api.md) for all endpoints.
 - [Semantic Kernel - Python](https://github.com/microsoft/semantic-kernel/tree/main/python/semantic_kernel/connectors/ai/ollama)
 - [Haystack](https://github.com/deepset-ai/haystack-integrations/blob/main/integrations/ollama.md)
 - [Ollama for R - rollama](https://github.com/JBGruber/rollama)
+- [Ollama-ex for Elixir](https://github.com/lebrunel/ollama-ex)
 
 ### Mobile
 
