@@ -184,32 +184,25 @@ func GetGPUInfo() GpuInfo {
 				slog.Info(fmt.Sprintf("[libnvml.so] CUDA GPU is too old. Falling back to CPU mode. Compute Capability detected: %d.%d", cc.major, cc.minor))
 			}
 		}
-	} else if gpuHandles.cudart != nil {
-		// Tegra is iGPU and maintains a flexible cache of RAM which should be taken into account.
-		mem, _ := getCPUMem()
+	} else if gpuHandles.cudart != nil && (cpuVariant != "" || runtime.GOARCH != "amd64") {
 		C.cudart_check_vram(*gpuHandles.cudart, &memInfo)
 		if memInfo.err != nil {
 			slog.Info(fmt.Sprintf("[libcudart.so] error looking up CUDART GPU memory: %s", C.GoString(memInfo.err)))
 			C.free(unsafe.Pointer(memInfo.err))
-		}
-
-		// Using the greater value of CUDA reported free memory and sysinfo reported free memory.
-		if C.uint64_t(mem.FreeMemory) > memInfo.free {
-			memInfo.free = C.uint64_t(mem.FreeMemory)
-		}
-
-		// Verify minimum compute capability
-		var cc C.cudart_compute_capability_t
-		C.cudart_compute_capability(*gpuHandles.cudart, &cc)
-		if cc.err != nil {
-			slog.Info(fmt.Sprintf("[libcudart.so] error looking up CUDA compute capability: %s", C.GoString(cc.err)))
-			C.free(unsafe.Pointer(cc.err))
-		} else if cc.major > CudaComputeMin[0] || (cc.major == CudaComputeMin[0] && cc.minor >= CudaComputeMin[1]) {
-			slog.Info(fmt.Sprintf("[libcudart.so] CUDART CUDA Compute Capability detected: %d.%d", cc.major, cc.minor))
-			memInfo.count += 1
-			resp.Library = "cudart"
-		} else {
-			slog.Info(fmt.Sprintf("[libcudart.so] CUDA GPU is too old. Falling back to CPU mode. Compute Capability detected: %d.%d", cc.major, cc.minor))
+		} else if memInfo.count > 0 {
+			// Verify minimum compute capability
+			var cc C.cudart_compute_capability_t
+			C.cudart_compute_capability(*gpuHandles.cudart, &cc)
+			if cc.err != nil {
+				slog.Info(fmt.Sprintf("[libcudart.so] error looking up CUDA compute capability: %s", C.GoString(cc.err)))
+				C.free(unsafe.Pointer(cc.err))
+			} else if cc.major > CudaComputeMin[0] || (cc.major == CudaComputeMin[0] && cc.minor >= CudaComputeMin[1]) {
+				slog.Info(fmt.Sprintf("[libcudart.so] CUDART CUDA Compute Capability detected: %d.%d", cc.major, cc.minor))
+				memInfo.count += 1
+				resp.Library = "cudart"
+			} else {
+				slog.Info(fmt.Sprintf("[libcudart.so] CUDA GPU is too old. Falling back to CPU mode. Compute Capability detected: %d.%d", cc.major, cc.minor))
+			}
 		}
 	} else if gpuHandles.rocm != nil && (cpuVariant != "" || runtime.GOARCH != "amd64") {
 		C.rocm_check_vram(*gpuHandles.rocm, &memInfo)
@@ -282,19 +275,19 @@ func getCPUMem() (memInfo, error) {
 
 func CheckVRAM() (int64, error) {
 	gpuInfo := GetGPUInfo()
-	if gpuInfo.FreeMemory > 0 && (gpuInfo.Library == "cuda" || gpuInfo.Library == "rocm") {
+	if gpuInfo.FreeMemory > 0 && (gpuInfo.Library == "nvml" || gpuInfo.Library == "cudart" || gpuInfo.Library == "rocm") {
 		// leave 10% or 1024MiB of VRAM free per GPU to handle unaccounted for overhead
 		overhead := gpuInfo.FreeMemory / 10
 		gpus := uint64(gpuInfo.DeviceCount)
 		if overhead < gpus*1024*1024*1024 {
 			overhead = gpus * 1024 * 1024 * 1024
 		}
-		avail := int64(gpuInfo.FreeMemory - overhead)
-		slog.Debug(fmt.Sprintf("%s detected %d devices with %dM available memory", gpuInfo.Library, gpuInfo.DeviceCount, avail/1024/1024))
-		return avail, nil
-	} else if gpuInfo.FreeMemory > 0 && (gpuInfo.Library == "tegra") {
-		// Assigning full reported free memory; Tegras use a large portion of free memory for cache and will re-allocate it when needed
+		// Assigning full reported free memory for Tegras due to OS controlled caching. Need to find a better way
 		avail := int64(gpuInfo.FreeMemory)
+		if CudaTegra == "" {
+			// Setting overhead for non-Tegra devices
+			avail -= int64(overhead)
+		}
 		slog.Debug(fmt.Sprintf("%s detected %d devices with %dM available memory", gpuInfo.Library, gpuInfo.DeviceCount, avail/1024/1024))
 		return avail, nil
 	}
