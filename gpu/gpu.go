@@ -179,7 +179,7 @@ func GetGPUInfo() GpuInfo {
 				C.free(unsafe.Pointer(cc.err))
 			} else if cc.major > CudaComputeMin[0] || (cc.major == CudaComputeMin[0] && cc.minor >= CudaComputeMin[1]) {
 				slog.Info(fmt.Sprintf("[libnvml.so] NVML CUDA Compute Capability detected: %d.%d", cc.major, cc.minor))
-				resp.Library = "nvml"
+				resp.Library = "cuda"
 			} else {
 				slog.Info(fmt.Sprintf("[libnvml.so] CUDA GPU is too old. Falling back to CPU mode. Compute Capability detected: %d.%d", cc.major, cc.minor))
 			}
@@ -199,7 +199,7 @@ func GetGPUInfo() GpuInfo {
 			} else if cc.major > CudaComputeMin[0] || (cc.major == CudaComputeMin[0] && cc.minor >= CudaComputeMin[1]) {
 				slog.Info(fmt.Sprintf("[libcudart.so] CUDART CUDA Compute Capability detected: %d.%d", cc.major, cc.minor))
 				memInfo.count += 1
-				resp.Library = "cudart"
+				resp.Library = "cuda"
 			} else {
 				slog.Info(fmt.Sprintf("[libcudart.so] CUDA GPU is too old. Falling back to CPU mode. Compute Capability detected: %d.%d", cc.major, cc.minor))
 			}
@@ -298,7 +298,7 @@ func getCPUMem() (memInfo, error) {
 
 func CheckVRAM() (int64, error) {
 	gpuInfo := GetGPUInfo()
-	if gpuInfo.FreeMemory > 0 && (gpuInfo.Library == "nvml" || gpuInfo.Library == "cudart" || gpuInfo.Library == "rocm") {
+	if gpuInfo.FreeMemory > 0 && (gpuInfo.Library == "cuda" || gpuInfo.Library == "rocm") {
 		// leave 10% or 1024MiB of VRAM free per GPU to handle unaccounted for overhead
 		overhead := gpuInfo.FreeMemory / 10
 		gpus := uint64(gpuInfo.DeviceCount)
