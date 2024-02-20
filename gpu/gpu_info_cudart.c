@@ -111,12 +111,12 @@ void cudart_check_vram(cudart_handle_t h, mem_info_t *resp) {
   resp->total = 0;
   resp->free = 0;
   for (i = 0; i < resp-> count; i++) {  
-    // ret = (*h.cudaSetDevice)(i);
-    // if (ret != CUDART_SUCCESS) {
-    //   snprintf(buf, buflen, "cudart device failed to initialize");
-    //   resp->err = strdup(buf);
-    //   return;
-    // }
+    ret = (*h.cudaSetDevice)(i);
+    if (ret != CUDART_SUCCESS) {
+      snprintf(buf, buflen, "cudart device failed to initialize");
+      resp->err = strdup(buf);
+      return;
+    }
     // ret = (*h.cudaDeviceSynchronize)();
     // if (ret != CUDART_SUCCESS) {
     //   snprintf(buf, buflen, "cudart device failed to synchronize");
@@ -127,7 +127,7 @@ void cudart_check_vram(cudart_handle_t h, mem_info_t *resp) {
     if (ret != CUDART_SUCCESS) {
       snprintf(buf, buflen, "cudart device memory info lookup failure %d", ret);
       resp->err = strdup(buf);
-      // ret = (*h.cudaDeviceReset)();
+      ret = (*h.cudaDeviceReset)();
       return;
     }
 
@@ -198,12 +198,12 @@ void cudart_compute_capability(cudart_handle_t h, cudart_compute_capability_t *r
   }
 
   for (i = 0; i < devices; i++) {
-    // ret = (*h.cudaSetDevice)(i);
-    // if (ret != CUDART_SUCCESS) {
-    //   snprintf(buf, buflen, "cudart device failed to initialize");
-    //   resp->err = strdup(buf);
-    //   return;
-    // }
+    ret = (*h.cudaSetDevice)(i);
+    if (ret != CUDART_SUCCESS) {
+      snprintf(buf, buflen, "cudart device failed to initialize");
+      resp->err = strdup(buf);
+      return;
+    }
     // ret = (*h.cudaDeviceSynchronize)();
     // if (ret != CUDART_SUCCESS) {
     //   snprintf(buf, buflen, "cudart device failed to synchronize");
