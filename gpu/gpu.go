@@ -168,20 +168,20 @@ func GetGPUInfo() GpuInfo {
 	if gpuHandles.nvml != nil && (cpuVariant != "" || runtime.GOARCH != "amd64") {
 		C.nvml_check_vram(*gpuHandles.nvml, &memInfo)
 		if memInfo.err != nil {
-			slog.Info(fmt.Sprintf("[libnvml.so] error looking up NVML GPU memory: %s", C.GoString(memInfo.err)))
+			slog.Info(fmt.Sprintf("[libnvidia-ml.so] error looking up NVML GPU memory: %s", C.GoString(memInfo.err)))
 			C.free(unsafe.Pointer(memInfo.err))
 		} else if memInfo.count > 0 {
 			// Verify minimum compute capability
 			var cc C.nvml_compute_capability_t
 			C.nvml_compute_capability(*gpuHandles.nvml, &cc)
 			if cc.err != nil {
-				slog.Info(fmt.Sprintf("[libnvml.so] error looking up NVML GPU compute capability: %s", C.GoString(cc.err)))
+				slog.Info(fmt.Sprintf("[libnvidia-ml.so] error looking up NVML GPU compute capability: %s", C.GoString(cc.err)))
 				C.free(unsafe.Pointer(cc.err))
 			} else if cc.major > CudaComputeMin[0] || (cc.major == CudaComputeMin[0] && cc.minor >= CudaComputeMin[1]) {
-				slog.Info(fmt.Sprintf("[libnvml.so] NVML CUDA Compute Capability detected: %d.%d", cc.major, cc.minor))
+				slog.Info(fmt.Sprintf("[libnvidia-ml.so] NVML CUDA Compute Capability detected: %d.%d", cc.major, cc.minor))
 				resp.Library = "cuda"
 			} else {
-				slog.Info(fmt.Sprintf("[libnvml.so] CUDA GPU is too old. Falling back to CPU mode. Compute Capability detected: %d.%d", cc.major, cc.minor))
+				slog.Info(fmt.Sprintf("[libnvidia-ml.so] CUDA GPU is too old. Falling back to CPU mode. Compute Capability detected: %d.%d", cc.major, cc.minor))
 			}
 		}
 	} else if gpuHandles.cudart != nil && (cpuVariant != "" || runtime.GOARCH != "amd64") {
@@ -198,7 +198,6 @@ func GetGPUInfo() GpuInfo {
 				C.free(unsafe.Pointer(cc.err))
 			} else if cc.major > CudaComputeMin[0] || (cc.major == CudaComputeMin[0] && cc.minor >= CudaComputeMin[1]) {
 				slog.Info(fmt.Sprintf("[libcudart.so] CUDART CUDA Compute Capability detected: %d.%d", cc.major, cc.minor))
-				memInfo.count += 1
 				resp.Library = "cuda"
 			} else {
 				slog.Info(fmt.Sprintf("[libcudart.so] CUDA GPU is too old. Falling back to CPU mode. Compute Capability detected: %d.%d", cc.major, cc.minor))

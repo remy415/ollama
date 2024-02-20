@@ -117,17 +117,10 @@ void cudart_check_vram(cudart_handle_t h, mem_info_t *resp) {
       resp->err = strdup(buf);
       return;
     }
-    // ret = (*h.cudaDeviceSynchronize)();
-    // if (ret != CUDART_SUCCESS) {
-    //   snprintf(buf, buflen, "cudart device failed to synchronize");
-    //   resp->err = strdup(buf);
-    //   return;
-    // }
     ret = (*h.cudaMemGetInfo)(&resp->free, &resp->total);
     if (ret != CUDART_SUCCESS) {
       snprintf(buf, buflen, "cudart device memory info lookup failure %d", ret);
       resp->err = strdup(buf);
-      ret = (*h.cudaDeviceReset)();
       return;
     }
 
@@ -136,7 +129,7 @@ void cudart_check_vram(cudart_handle_t h, mem_info_t *resp) {
       // When in verbose mode, report more information about
       // the card we discover, but don't fail on error
       // Need to map out alternatives of these for CUDART libraries
-      // For now just returning an
+      // For now just returning a generic "unsupported" error.
       ret = CUDART_UNSUPPORTED;
       if (ret != CUDART_SUCCESS) {
         LOG(h.verbose, "nvmlDeviceGetName unsupported with CUDART libraries: %d\n", ret);
@@ -204,12 +197,7 @@ void cudart_compute_capability(cudart_handle_t h, cudart_compute_capability_t *r
       resp->err = strdup(buf);
       return;
     }
-    // ret = (*h.cudaDeviceSynchronize)();
-    // if (ret != CUDART_SUCCESS) {
-    //   snprintf(buf, buflen, "cudart device failed to synchronize");
-    //   resp->err = strdup(buf);
-    //   return;
-    // }
+
     ret = (*h.cudaDeviceGetAttribute)(&major, cudartDevAttrComputeCapabilityMajor, i);
     if (ret != CUDART_SUCCESS) {
       snprintf(buf, buflen, "device compute capability lookup failure %d: %d", i, ret);
