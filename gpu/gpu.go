@@ -23,16 +23,10 @@ import (
 )
 
 type handles struct {
-	cuda *C.cuda_handle_t
-	rocm *C.rocm_handle_t
+	nvml   *C.nvml_handle_t
+	rocm   *C.rocm_handle_t
+	cudart *C.cudart_handle_t
 }
-
-// Enum to keep track of which CUDA library is used
-const (
-	LibUnknown = iota
-	LibCUDART
-	LibNVIDIAML
-)
 
 var gpuMutex sync.Mutex
 var gpuHandles *handles = nil
@@ -56,9 +50,7 @@ var CudartLinuxGlobs = []string{
 }
 
 // Possible locations for the nvidia-ml library
-var CudaLinuxGlobs = []string{
-
-	"/usr/local/cuda/lib*/libnvidia-ml.so*",
+var NvmlLinuxGlobs = []string{
 	"/usr/local/cuda/lib64/libnvidia-ml.so*",
 	"/usr/lib/x86_64-linux-gnu/nvidia/current/libnvidia-ml.so*",
 	"/usr/lib/x86_64-linux-gnu/libnvidia-ml.so*",
@@ -66,21 +58,31 @@ var CudaLinuxGlobs = []string{
 	"/usr/lib/wsl/drivers/*/libnvidia-ml.so*",
 	"/opt/cuda/lib64/libnvidia-ml.so*",
 	"/usr/lib*/libnvidia-ml.so*",
-	"/usr/local/lib*/libnvidia-ml.so*",
 	"/usr/lib/aarch64-linux-gnu/nvidia/current/libnvidia-ml.so*",
 	"/usr/lib/aarch64-linux-gnu/libnvidia-ml.so*",
+	"/usr/local/lib*/libnvidia-ml.so*",
 
 	// TODO: are these stubs ever valid?
 	"/opt/cuda/targets/x86_64-linux/lib/stubs/libnvidia-ml.so*",
 }
 
-var CudartWindowsGlobs = []string{
-	"c:\\Windows\\System32\\cudart64_*.dll",
-	"c:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v*\\bin\\cudart64_*.dll",
+var NvmlWindowsGlobs = []string{
+	"c:\\Windows\\System32\\nvml.dll",
 }
 
-var CudaWindowsGlobs = []string{
-	"c:\\Windows\\System32\\nvml.dll",
+var CudartLinuxGlobs = []string{
+	"/usr/local/cuda/lib64/libcudart.so*",
+	"/usr/lib/x86_64-linux-gnu/nvidia/current/libcudart.so*",
+	"/usr/lib/x86_64-linux-gnu/libcudart.so*",
+	"/usr/lib/wsl/lib/libcudart.so*",
+	"/usr/lib/wsl/drivers/*/libcudart.so*",
+	"/opt/cuda/lib64/libcudart.so*",
+	"/usr/local/cuda*/targets/aarch64-linux/lib/libcudart.so*",
+	"/usr/lib/aarch64-linux-gnu/nvidia/current/libcudart.so*",
+	"/usr/lib/aarch64-linux-gnu/libcudart.so*",
+	"/usr/local/cuda/lib*/libcudart.so*",
+	"/usr/lib*/libcudart.so*",
+	"/usr/local/lib*/libcudart.so*",
 }
 
 var RocmLinuxGlobs = []string{
@@ -91,6 +93,8 @@ var RocmWindowsGlobs = []string{
 	"c:\\Windows\\System32\\rocm_smi64.dll",
 }
 
+// Jetson devices have JETSON_JETPACK="x.y.z" factory set to the Jetpack version installed.
+// Included to drive logic for reducing Ollama-allocated overhead on L4T/Jetson devices.
 var CudaTegra string = os.Getenv("JETSON_JETPACK")
 
 // Note: gpuMutex must already be held
@@ -98,31 +102,28 @@ func initGPUHandles() {
 
 	// TODO - if the ollama build is CPU only, don't do these checks as they're irrelevant and confusing
 
-	gpuHandles = &handles{nil, nil}
-	var cudartMgmtName string
-	var cudartMgmtPatterns []string
-	var cudaMgmtName string
-	var cudaMgmtPatterns []string
+	gpuHandles = &handles{nil, nil, nil}
+	var nvmlMgmtName string
+	var nvmlMgmtPatterns []string
 	var rocmMgmtName string
 	var rocmMgmtPatterns []string
+	var cudartMgmtName string
+	var cudartMgmtPatterns []string
 	switch runtime.GOOS {
 	case "windows":
-		cudartMgmtName = "cudart64_*.dll"
-		cudartMgmtPatterns = make([]string, len(CudartWindowsGlobs))
-		copy(cudartMgmtPatterns, CudartWindowsGlobs)
-		cudaMgmtName = "nvml.dll"
-		cudaMgmtPatterns = make([]string, len(CudaWindowsGlobs))
-		copy(cudaMgmtPatterns, CudaWindowsGlobs)
+		nvmlMgmtName = "nvml.dll"
+		nvmlMgmtPatterns = make([]string, len(NvmlWindowsGlobs))
+		copy(nvmlMgmtPatterns, NvmlWindowsGlobs)
 		rocmMgmtName = "rocm_smi64.dll"
 		rocmMgmtPatterns = make([]string, len(RocmWindowsGlobs))
 		copy(rocmMgmtPatterns, RocmWindowsGlobs)
 	case "linux":
+		nvmlMgmtName = "libnvidia-ml.so"
+		nvmlMgmtPatterns = make([]string, len(NvmlLinuxGlobs))
+		copy(nvmlMgmtPatterns, NvmlLinuxGlobs)
 		cudartMgmtName = "libcudart.so"
 		cudartMgmtPatterns = make([]string, len(CudartLinuxGlobs))
 		copy(cudartMgmtPatterns, CudartLinuxGlobs)
-		cudaMgmtName = "libnvidia-ml.so"
-		cudaMgmtPatterns = make([]string, len(CudaLinuxGlobs))
-		copy(cudaMgmtPatterns, CudaLinuxGlobs)
 		rocmMgmtName = "librocm_smi64.so"
 		rocmMgmtPatterns = make([]string, len(RocmLinuxGlobs))
 		copy(rocmMgmtPatterns, RocmLinuxGlobs)
@@ -131,26 +132,23 @@ func initGPUHandles() {
 	}
 
 	slog.Info("Detecting GPU type")
-	// Prefer libcudart.so if it's available
-	cudartLibPaths := FindGPULibs(cudartMgmtName, cudartMgmtPatterns)
-	if len(cudartLibPaths) > 0 {
-		cuda := LoadCUDAMgmt(cudartLibPaths)
-		if cuda != nil {
-			slog.Info("Nvidia GPU detected")
-			gpuHandles.cuda = cuda
-			gpuHandles.cuda.lib_t = LibCUDART
+	nvmlLibPaths := FindGPULibs(nvmlMgmtName, nvmlMgmtPatterns)
+	if len(nvmlLibPaths) > 0 {
+		nvml := LoadNVMLMgmt(nvmlLibPaths)
+		if nvml != nil {
+			slog.Info("Nvidia GPU detected via libnvidia-ml.so")
+			gpuHandles.nvml = nvml
 			return
 		}
-	} else {
-		cudaLibPaths := FindGPULibs(cudaMgmtName, cudaMgmtPatterns)
-		if len(cudaLibPaths) > 0 {
-			cuda := LoadCUDAMgmt(cudaLibPaths)
-			if cuda != nil {
-				slog.Info("Nvidia GPU detected")
-				gpuHandles.cuda = cuda
-				gpuHandles.cuda.lib_t = LibNVIDIAML
-				return
-			}
+	}
+
+	cudartLibPaths := FindGPULibs(cudartMgmtName, cudartMgmtPatterns)
+	if len(cudartLibPaths) > 0 {
+		cudart := LoadCUDARTMgmt(cudartLibPaths)
+		if cudart != nil {
+			slog.Info("Nvidia GPU detected via libcudart.so")
+			gpuHandles.cudart = cudart
+			return
 		}
 	}
 
@@ -182,29 +180,51 @@ func GetGPUInfo() GpuInfo {
 
 	var memInfo C.mem_info_t
 	resp := GpuInfo{}
-	if gpuHandles.cuda != nil && (cpuVariant != "" || runtime.GOARCH != "amd64") {
-		C.cuda_check_vram(*gpuHandles.cuda, &memInfo)
+	if gpuHandles.nvml != nil && (cpuVariant != "" || runtime.GOARCH != "amd64") {
+		C.nvml_check_vram(*gpuHandles.nvml, &memInfo)
 		if memInfo.err != nil {
-			slog.Info(fmt.Sprintf("error looking up CUDA GPU memory: %s", C.GoString(memInfo.err)))
+			slog.Info(fmt.Sprintf("[libnvidia-ml.so] error looking up NVML GPU memory: %s", C.GoString(memInfo.err)))
 			C.free(unsafe.Pointer(memInfo.err))
 		} else if memInfo.count > 0 {
 			// Verify minimum compute capability
-			var cc C.cuda_compute_capability_t
-			C.cuda_compute_capability(*gpuHandles.cuda, &cc)
+			var cc C.nvml_compute_capability_t
+			C.nvml_compute_capability(*gpuHandles.nvml, &cc)
 			if cc.err != nil {
-				slog.Info(fmt.Sprintf("error looking up CUDA GPU compute capability: %s", C.GoString(cc.err)))
+				slog.Info(fmt.Sprintf("[libnvidia-ml.so] error looking up NVML GPU compute capability: %s", C.GoString(cc.err)))
 				C.free(unsafe.Pointer(cc.err))
 			} else if cc.major > CudaComputeMin[0] || (cc.major == CudaComputeMin[0] && cc.minor >= CudaComputeMin[1]) {
-				slog.Info(fmt.Sprintf("CUDA Compute Capability detected: %d.%d", cc.major, cc.minor))
+				slog.Info(fmt.Sprintf("[libnvidia-ml.so] NVML CUDA Compute Capability detected: %d.%d", cc.major, cc.minor))
 				resp.Library = "cuda"
 			} else {
-				slog.Info(fmt.Sprintf("CUDA GPU is too old. Falling back to CPU mode. Compute Capability detected: %d.%d", cc.major, cc.minor))
+				slog.Info(fmt.Sprintf("[libnvidia-ml.so] CUDA GPU is too old. Falling back to CPU mode. Compute Capability detected: %d.%d", cc.major, cc.minor))
+			}
+		}
+	} else if gpuHandles.cudart != nil && (cpuVariant != "" || runtime.GOARCH != "amd64") {
+		C.cudart_check_vram(*gpuHandles.cudart, &memInfo)
+		if memInfo.err != nil {
+			slog.Info(fmt.Sprintf("[libcudart.so] error looking up CUDART GPU memory: %s", C.GoString(memInfo.err)))
+			C.free(unsafe.Pointer(memInfo.err))
+		} else if memInfo.count > 0 {
+			// Verify minimum compute capability
+			var cc C.cudart_compute_capability_t
+			C.cudart_compute_capability(*gpuHandles.cudart, &cc)
+			if cc.err != nil {
+				slog.Info(fmt.Sprintf("[libcudart.so] error looking up CUDA compute capability: %s", C.GoString(cc.err)))
+				C.free(unsafe.Pointer(cc.err))
+			} else if cc.major > CudaComputeMin[0] || (cc.major == CudaComputeMin[0] && cc.minor >= CudaComputeMin[1]) {
+				slog.Info(fmt.Sprintf("[libcudart.so] CUDART CUDA Compute Capability detected: %d.%d", cc.major, cc.minor))
+				resp.Library = "cuda"
+			} else {
+				slog.Info(fmt.Sprintf("[libcudart.so] CUDA GPU is too old. Falling back to CPU mode. Compute Capability detected: %d.%d", cc.major, cc.minor))
 			}
 		}
 	} else if AMDDetected() && gpuHandles.rocm != nil && (cpuVariant != "" || runtime.GOARCH != "amd64") {
 		ver, err := AMDDriverVersion()
 		if err == nil {
 			slog.Info("AMD Driver: " + ver)
+		} else {
+			// For now this is benign, but we may eventually need to fail compatibility checks
+			slog.Debug("error looking up amd driver version: %s", err)
 		}
 		gfx := AMDGFXVersions()
 		tooOld := false
@@ -299,9 +319,11 @@ func CheckVRAM() (int64, error) {
 		if overhead < gpus*1024*1024*1024 {
 			overhead = gpus * 1024 * 1024 * 1024
 		}
-		avail := int64(gpuInfo.FreeMemory - overhead)
-		if (gpuInfo.Library == "cuda" && CudaTegra != "") {
-			avail = int64(gpuInfo.FreeMemory)
+		// Assigning full reported free memory for Tegras due to OS controlled caching. Need to find a better way
+		avail := int64(gpuInfo.FreeMemory)
+		if CudaTegra == "" {
+			// Setting overhead for non-Tegra devices
+			avail -= int64(overhead)
 		}
 		slog.Debug(fmt.Sprintf("%s detected %d devices with %dM available memory", gpuInfo.Library, gpuInfo.DeviceCount, avail/1024/1024))
 		return avail, nil
@@ -364,15 +386,32 @@ func FindGPULibs(baseLibName string, patterns []string) []string {
 	return gpuLibPaths
 }
 
-func LoadCUDAMgmt(cudaLibPaths []string) *C.cuda_handle_t {
-	var resp C.cuda_init_resp_t
+func LoadNVMLMgmt(nvmlLibPaths []string) *C.nvml_handle_t {
+	var resp C.nvml_init_resp_t
 	resp.ch.verbose = getVerboseState()
-	for _, libPath := range cudaLibPaths {
+	for _, libPath := range nvmlLibPaths {
 		lib := C.CString(libPath)
 		defer C.free(unsafe.Pointer(lib))
-		C.cuda_init(lib, &resp)
+		C.nvml_init(lib, &resp)
 		if resp.err != nil {
-			slog.Info(fmt.Sprintf("Unable to load CUDA management library %s: %s", libPath, C.GoString(resp.err)))
+			slog.Info(fmt.Sprintf("Unable to load NVML management library %s: %s", libPath, C.GoString(resp.err)))
+			C.free(unsafe.Pointer(resp.err))
+		} else {
+			return &resp.ch
+		}
+	}
+	return nil
+}
+
+func LoadCUDARTMgmt(cudartLibPaths []string) *C.cudart_handle_t {
+	var resp C.cudart_init_resp_t
+	resp.ch.verbose = getVerboseState()
+	for _, libPath := range cudartLibPaths {
+		lib := C.CString(libPath)
+		defer C.free(unsafe.Pointer(lib))
+		C.cudart_init(lib, &resp)
+		if resp.err != nil {
+			slog.Info(fmt.Sprintf("Unable to load cudart CUDA management library %s: %s", libPath, C.GoString(resp.err)))
 			C.free(unsafe.Pointer(resp.err))
 		} else {
 			return &resp.ch
