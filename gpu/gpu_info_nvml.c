@@ -2,7 +2,7 @@
 
 #include <string.h>
 
-#include "gpu_info_cuda.h"
+#include "gpu_info_nvml.h"
 
 void cuda_init(char *cuda_lib_path, cuda_init_resp_t *resp) {
   nvmlReturn_t ret;
