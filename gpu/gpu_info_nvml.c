@@ -156,7 +156,7 @@ void nvml_check_vram(nvml_handle_t h, mem_info_t *resp) {
     }
 
     LOG(h.verbose, "[%d] CUDA totalMem %ld\n", i, memInfo.total);
-    LOG(h.verbose, "[%d] CUDA usedMem %ld\n", i, memInfo.free);
+    LOG(h.verbose, "[%d] CUDA freeMem %ld\n", i, memInfo.free);
 
     resp->total += memInfo.total;
     resp->free += memInfo.free;
