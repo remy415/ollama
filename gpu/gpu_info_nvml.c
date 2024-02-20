@@ -1,8 +1,8 @@
 #ifndef __APPLE__  // TODO - maybe consider nvidia support on intel macs?
 
-#include "gpu_info_nvml.h"
-
 #include <string.h>
+
+#include "gpu_info_nvml.h"
 
 void nvml_init(char *nvml_lib_path, nvml_init_resp_t *resp) {
   nvmlReturn_t ret;
