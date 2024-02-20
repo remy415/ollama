@@ -34,21 +34,6 @@ var gpuHandles *handles = nil
 // With our current CUDA compile flags, older than 5.0 will not work properly
 var CudaComputeMin = [2]C.int{5, 0}
 
-var CudartLinuxGlobs = []string{
-	"/usr/local/cuda/lib64/libcudart.so*",
-	"/usr/local/cuda*/lib64/libcudart.so*",
-	"targets/aarch64-linux/lib/libcudart.so*",
-	"/usr/lib/x86_64-linux-gnu/nvidia/current/libcudart.so*",
-	"/usr/lib/x86_64-linux-gnu/libcudart.so*",
-	"/usr/lib/wsl/lib/libcudart.so*",
-	"/usr/lib/wsl/drivers/*/libcudart.so*",
-	"/opt/cuda/lib64/libcudart.so*",
-	"/usr/lib*/libcudart.so*",
-	"/usr/local/lib*/libcudart.so*",
-	"/usr/lib/aarch64-linux-gnu/nvidia/current/libcudart.so*",
-	"/usr/lib/aarch64-linux-gnu/libcudart.so*",
-}
-
 // Possible locations for the nvidia-ml library
 var NvmlLinuxGlobs = []string{
 	"/usr/local/cuda/lib64/libnvidia-ml.so*",
