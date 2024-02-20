@@ -39,39 +39,8 @@ init_vars() {
     *)
         ;;
     esac
-    if [ -f /etc/nv_tegra_release ] ; then
-        TEGRA_DEVICE=1
-        echo "Tegra device detected: ${JETSON_MODEL}, L4T Version ${JETSON_L4T}, Jetpack Version ${JETSON_JETPACK}"
-    fi
     if [ -z "${CMAKE_CUDA_ARCHITECTURES}" ] ; then
-        if [ -n ${TEGRA_DEVICE} ]; then
-            echo "CMAKE_CUDA_ARCHITECTURES unset, values are needed for Tegra devices. Using default values defined at https://github.com/dusty-nv/jetson-containers/blob/master/jetson_containers/l4t_version.py"
-        fi
-        # Tegra devices will fail generate unless architectures are set:
-        # Nano/TX1 = 5.3, TX2 = 6.2, Xavier = 7.2, Orin = 8.7
-        # L4T_VERSION.major >= 36:    # JetPack 6
-        #     CUDA_ARCHITECTURES = [87]
-        # L4T_VERSION.major >= 34:  # JetPack 5
-        #     CUDA_ARCHITECTURES = [72, 87]
-        # L4T_VERSION.major == 32:  # JetPack 4
-        #     CUDA_ARCHITECTURES = [53, 62, 72]
-        case $(echo "${JETSON_JETPACK}" | cut -d"." -f1) in
-        "6")
-            echo "Jetpack 6 detected. Setting CMAKE_CUDA_ARCHITECTURES='87'"
-            CMAKE_CUDA_ARCHITECTURES="87"
-            ;;
-        "5")
-            echo "Jetpack 5 detected. Setting CMAKE_CUDA_ARCHITECTURES='72;87'"
-            CMAKE_CUDA_ARCHITECTURES="72;87"
-            ;;
-        "4")
-            echo "Jetpack 4 detected. Setting CMAKE_CUDA_ARCHITECTURES='53;62;72'"
-            CMAKE_CUDA_ARCHITECTURES="53;62;72"
-            ;;
-        *)
-            CMAKE_CUDA_ARCHITECTURES="50;52;61;70;75;80"
-            ;;
-        esac
+        CMAKE_CUDA_ARCHITECTURES="50;52;61;70;75;80"
     fi
 }
 
