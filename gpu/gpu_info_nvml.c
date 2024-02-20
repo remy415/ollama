@@ -4,7 +4,7 @@
 
 #include "gpu_info_nvml.h"
 
-void cuda_init(char *cuda_lib_path, cuda_init_resp_t *resp) {
+void nvml_init(char *nvml_lib_path, nvml_init_resp_t *resp) {
   nvmlReturn_t ret;
   resp->err = NULL;
   const int buflen = 256;
