@@ -48,7 +48,7 @@ func getDynLibs(gpuInfo gpu.GpuInfo) []string {
 	}
 	// Try to find an exact match
 	for cmp := range availableDynLibs {
-		if requested == cmp {
+		if requested == cmp || requested == "nvml" || requested == "cudart" {
 			exactMatch = cmp
 			dynLibs = []string{availableDynLibs[cmp]}
 			break
