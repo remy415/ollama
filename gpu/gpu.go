@@ -261,9 +261,7 @@ func GetGPUInfo() GpuInfo {
 				} else {
 					slog.Info(fmt.Sprintf("failed to look up ROCm version: %s", verString))
 				}
-				if version.str != nil {
-					C.free(unsafe.Pointer(version.str))
-				}
+				C.free(unsafe.Pointer(version.str))
 			}
 		}
 	}
