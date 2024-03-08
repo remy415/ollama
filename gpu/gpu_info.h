@@ -54,7 +54,6 @@ void cpu_check_ram(mem_info_t *resp);
 
 #include "gpu_info_nvml.h"
 #include "gpu_info_cudart.h"
-#include "gpu_info_rocm.h"
 
 #endif  // __GPU_INFO_H__
 #endif  // __APPLE__
