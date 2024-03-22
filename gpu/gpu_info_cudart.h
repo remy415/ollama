@@ -17,9 +17,9 @@ typedef enum cudartDeviceAttr_enum {
 
 typedef void *cudartDevice_t;  // Opaque is sufficient
 typedef struct cudartMemory_st {
-  unsigned long long total;
-  unsigned long long free;
-  unsigned long long used;
+  size_t total;
+  size_t free;
+  size_t used;
 } cudartMemory_t;
 
 typedef struct cudartDriverVersion {

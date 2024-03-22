@@ -69,6 +69,10 @@ var CudartLinuxGlobs = []string{
 	"/usr/local/lib*/libcudart.so*",
 }
 
+var CudartWindowsGlobs = []string{
+	"c:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v*\\bin\\cudart64_*.dll",
+}
+
 // Jetson devices have JETSON_JETPACK="x.y.z" factory set to the Jetpack version installed.
 // Included to drive logic for reducing Ollama-allocated overhead on L4T/Jetson devices.
 var CudaTegra string = os.Getenv("JETSON_JETPACK")
@@ -83,39 +87,49 @@ func initGPUHandles() {
 	var nvmlMgmtPatterns []string
 	var cudartMgmtName string
 	var cudartMgmtPatterns []string
+
+	tmpDir, _ := AssetsDir()
 	switch runtime.GOOS {
 	case "windows":
 		nvmlMgmtName = "nvml.dll"
 		nvmlMgmtPatterns = make([]string, len(NvmlWindowsGlobs))
 		copy(nvmlMgmtPatterns, NvmlWindowsGlobs)
+		cudartMgmtName = "cudart64_*.dll"
+		localAppData := os.Getenv("LOCALAPPDATA")
+		cudartMgmtPatterns = []string{filepath.Join(localAppData, "Programs", "Ollama", cudartMgmtName)}
+		cudartMgmtPatterns = append(cudartMgmtPatterns, CudartWindowsGlobs...)
 	case "linux":
 		nvmlMgmtName = "libnvidia-ml.so"
 		nvmlMgmtPatterns = make([]string, len(NvmlLinuxGlobs))
 		copy(nvmlMgmtPatterns, NvmlLinuxGlobs)
-		cudartMgmtName = "libcudart.so"
-		cudartMgmtPatterns = make([]string, len(CudartLinuxGlobs))
-		copy(cudartMgmtPatterns, CudartLinuxGlobs)
+		cudartMgmtName = "libcudart.so*"
+		if tmpDir != "" {
+			// TODO - add "payloads" for subprocess
+			cudartMgmtPatterns = []string{filepath.Join(tmpDir, "cuda*", cudartMgmtName)}
+		}
+		cudartMgmtPatterns = append(cudartMgmtPatterns, CudartLinuxGlobs...)
 	default:
 		return
 	}
 
 	slog.Info("Detecting GPU type")
-	nvmlLibPaths := FindGPULibs(nvmlMgmtName, nvmlMgmtPatterns)
-	if len(nvmlLibPaths) > 0 {
-		nvml := LoadNVMLMgmt(nvmlLibPaths)
-		if nvml != nil {
-			slog.Info("Nvidia GPU detected via libnvidia-ml.so")
-			gpuHandles.nvml = nvml
-			return
-		}
-	}
-
 	cudartLibPaths := FindGPULibs(cudartMgmtName, cudartMgmtPatterns)
 	if len(cudartLibPaths) > 0 {
 		cudart := LoadCUDARTMgmt(cudartLibPaths)
 		if cudart != nil {
-			slog.Info("Nvidia GPU detected via libcudart.so")
+			slog.Info("Nvidia GPU detected via cudart")
 			gpuHandles.cudart = cudart
+			return
+		}
+	}
+
+	// TODO once we build confidence, remove this and the gpu_info_nvml.[ch] files
+	nvmlLibPaths := FindGPULibs(nvmlMgmtName, nvmlMgmtPatterns)
+	if len(nvmlLibPaths) > 0 {
+		nvml := LoadNVMLMgmt(nvmlLibPaths)
+		if nvml != nil {
+			slog.Info("Nvidia GPU detected via nvidia-ml")
+			gpuHandles.nvml = nvml
 			return
 		}
 	}
@@ -142,39 +156,39 @@ func GetGPUInfo() GpuInfo {
 	if gpuHandles.nvml != nil && (cpuVariant != "" || runtime.GOARCH != "amd64") {
 		C.nvml_check_vram(*gpuHandles.nvml, &memInfo)
 		if memInfo.err != nil {
-			slog.Info(fmt.Sprintf("[libnvidia-ml.so] error looking up NVML GPU memory: %s", C.GoString(memInfo.err)))
+			slog.Info(fmt.Sprintf("[nvidia-ml] error looking up NVML GPU memory: %s", C.GoString(memInfo.err)))
 			C.free(unsafe.Pointer(memInfo.err))
 		} else if memInfo.count > 0 {
 			// Verify minimum compute capability
 			var cc C.nvml_compute_capability_t
 			C.nvml_compute_capability(*gpuHandles.nvml, &cc)
 			if cc.err != nil {
-				slog.Info(fmt.Sprintf("[libnvidia-ml.so] error looking up NVML GPU compute capability: %s", C.GoString(cc.err)))
+				slog.Info(fmt.Sprintf("[nvidia-ml] error looking up NVML GPU compute capability: %s", C.GoString(cc.err)))
 				C.free(unsafe.Pointer(cc.err))
 			} else if cc.major > CudaComputeMin[0] || (cc.major == CudaComputeMin[0] && cc.minor >= CudaComputeMin[1]) {
-				slog.Info(fmt.Sprintf("[libnvidia-ml.so] NVML CUDA Compute Capability detected: %d.%d", cc.major, cc.minor))
+				slog.Info(fmt.Sprintf("[nvidia-ml] NVML CUDA Compute Capability detected: %d.%d", cc.major, cc.minor))
 				resp.Library = "cuda"
 			} else {
-				slog.Info(fmt.Sprintf("[libnvidia-ml.so] CUDA GPU is too old. Falling back to CPU mode. Compute Capability detected: %d.%d", cc.major, cc.minor))
+				slog.Info(fmt.Sprintf("[nvidia-ml] CUDA GPU is too old. Falling back to CPU mode. Compute Capability detected: %d.%d", cc.major, cc.minor))
 			}
 		}
 	} else if gpuHandles.cudart != nil && (cpuVariant != "" || runtime.GOARCH != "amd64") {
 		C.cudart_check_vram(*gpuHandles.cudart, &memInfo)
 		if memInfo.err != nil {
-			slog.Info(fmt.Sprintf("[libcudart.so] error looking up CUDART GPU memory: %s", C.GoString(memInfo.err)))
+			slog.Info(fmt.Sprintf("[cudart] error looking up CUDART GPU memory: %s", C.GoString(memInfo.err)))
 			C.free(unsafe.Pointer(memInfo.err))
 		} else if memInfo.count > 0 {
 			// Verify minimum compute capability
 			var cc C.cudart_compute_capability_t
 			C.cudart_compute_capability(*gpuHandles.cudart, &cc)
 			if cc.err != nil {
-				slog.Info(fmt.Sprintf("[libcudart.so] error looking up CUDA compute capability: %s", C.GoString(cc.err)))
+				slog.Info(fmt.Sprintf("[cudart] error looking up CUDA compute capability: %s", C.GoString(cc.err)))
 				C.free(unsafe.Pointer(cc.err))
 			} else if cc.major > CudaComputeMin[0] || (cc.major == CudaComputeMin[0] && cc.minor >= CudaComputeMin[1]) {
-				slog.Info(fmt.Sprintf("[libcudart.so] CUDART CUDA Compute Capability detected: %d.%d", cc.major, cc.minor))
+				slog.Info(fmt.Sprintf("[cudart] CUDART CUDA Compute Capability detected: %d.%d", cc.major, cc.minor))
 				resp.Library = "cuda"
 			} else {
-				slog.Info(fmt.Sprintf("[libcudart.so] CUDA GPU is too old. Falling back to CPU mode. Compute Capability detected: %d.%d", cc.major, cc.minor))
+				slog.Info(fmt.Sprintf("[cudart] CUDA GPU is too old. Falling back to CPU mode. Compute Capability detected: %d.%d", cc.major, cc.minor))
 			}
 		}
 	} else {

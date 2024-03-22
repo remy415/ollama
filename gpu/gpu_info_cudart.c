@@ -86,7 +86,7 @@ void cudart_init(char *cudart_lib_path, cudart_init_resp_t *resp) {
 
 void cudart_check_vram(cudart_handle_t h, mem_info_t *resp) {
   resp->err = NULL;
-  cudartMemory_t memInfo = {0};
+  cudartMemory_t memInfo = {0,0,0};
   cudartReturn_t ret;
   const int buflen = 256;
   char buf[buflen + 1];
@@ -117,7 +117,7 @@ void cudart_check_vram(cudart_handle_t h, mem_info_t *resp) {
       resp->err = strdup(buf);
       return;
     }
-    ret = (*h.cudaMemGetInfo)(&resp->free, &resp->total);
+    ret = (*h.cudaMemGetInfo)(&memInfo.free, &memInfo.total);
     if (ret != CUDART_SUCCESS) {
       snprintf(buf, buflen, "cudart device memory info lookup failure %d", ret);
       resp->err = strdup(buf);
@@ -158,8 +158,8 @@ void cudart_check_vram(cudart_handle_t h, mem_info_t *resp) {
       }
     }
 
-    LOG(h.verbose, "[%d] CUDA totalMem %ld\n", i, resp->total);
-    LOG(h.verbose, "[%d] CUDA freeMem %ld\n", i, resp->free);
+    LOG(h.verbose, "[%d] CUDA totalMem %lu\n", i, memInfo.total);
+    LOG(h.verbose, "[%d] CUDA freeMem %lu\n", i, memInfo.free);
 
     resp->total += memInfo.total;
     resp->free += memInfo.free;
